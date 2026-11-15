@@ -1,0 +1,56 @@
+# ===== Umum =====
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak
+
+# ===== Rahasia & data lokal (JANGAN di-commit) =====
+.env
+.env.*
+!.env.example
+!.env.testing.example
+!.env.production.example
+*.db
+*.sqlite
+*.sqlite3
+storage/uploads/*
+!storage/uploads/.gitkeep
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+
+# ===== Backend (Python / FastAPI) =====
+backend/.venv/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Mobile (Flutter / Android / Dart) =====
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/android/.gradle/
+mobile/android/.kotlin/
+mobile/android/local.properties
+mobile/android/app/debug/
+mobile/android/app/release/
+mobile/*.iml
+mobile/.idea/
+mobile/test/goldens/
+*.jks
+*.keystore
+key.properties
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.iml
