@@ -10,6 +10,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
+# Jalankan sebagai user biasa (UID 1000, wajib di Hugging Face Spaces) yang boleh menulis folder upload.
+RUN useradd -m -u 1000 appuser && mkdir -p storage/uploads && chown -R appuser /app
+USER appuser
+
 ENV TESSERACT_CMD="" APP_ENV=production PORT=8000
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
