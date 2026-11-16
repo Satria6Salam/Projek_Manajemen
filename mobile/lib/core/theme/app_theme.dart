@@ -20,6 +20,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
+          fontFamily: 'Roboto',
           color: AppColors.navy,
           fontSize: 20,
           fontWeight: FontWeight.w700,
@@ -32,7 +33,8 @@ class AppTheme {
           minimumSize: const Size.fromHeight(52),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(
+              fontFamily: 'Roboto', fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -42,7 +44,8 @@ class AppTheme {
           side: const BorderSide(color: AppColors.border),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+              fontFamily: 'Roboto', fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -58,6 +61,7 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
+            fontFamily: 'Roboto',
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? AppColors.primary : AppColors.textGrey,

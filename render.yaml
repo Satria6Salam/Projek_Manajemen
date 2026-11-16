@@ -1,0 +1,48 @@
+# Deploy backend STRUKKU ke Render (paket gratis).
+# Cara pakai: render.com -> New -> Blueprint -> pilih repositori ini.
+# Hasil: https://strukku-api.onrender.com (HTTPS/SSL otomatis dari Render).
+services:
+  - type: web
+    name: strukku-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      # "staging": boleh menyimpan foto struk di disk server (sementara, hilang saat restart).
+      # Untuk produksi penuh ganti ke "production" + Supabase Storage.
+      - key: APP_ENV
+        value: staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: strukku-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        sync: false # diisi manual di dashboard Render (minimal 48 karakter)
+      - key: AUTO_MIGRATE
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      # Server belum punya SMTP, jadi akun baru langsung aktif tanpa verifikasi email.
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "false"
+      - key: PUBLIC_BASE_URL
+        value: https://strukku-api.onrender.com
+      - key: TESSERACT_CMD
+        value: ""
+      - key: OCR_LANG
+        value: ind+eng
+      - key: STORAGE_BACKEND
+        value: local
+
+databases:
+  # PostgreSQL gratis Render (berlaku 30 hari, bisa dibuat ulang / dipindah ke Supabase).
+  - name: strukku-db
+    plan: free
+    region: singapore
+    databaseName: strukku

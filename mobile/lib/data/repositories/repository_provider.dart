@@ -29,6 +29,16 @@ class AppRepositories {
 
   static late AppRepositories instance;
 
+  /// Hanya untuk pengujian / pembuatan tangkapan layar: pakai repository palsu.
+  static void useForTesting({
+    required AuthRepository auth,
+    required CategoryRepository categories,
+    required ReceiptRepository receipts,
+  }) {
+    instance =
+        AppRepositories._(auth: auth, categories: categories, receipts: receipts);
+  }
+
   static void init() {
     if (AppConfig.useFastApi) {
       final client = FastApiClient();

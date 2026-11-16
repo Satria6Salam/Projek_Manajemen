@@ -12,7 +12,13 @@ class SimpleBarChart extends StatelessWidget {
     this.highlightIndex,
     this.height = 140,
     this.showEveryNthLabel = 1,
+    this.format,
   });
+
+  /// Format nilai untuk label & tooltip (default: Rupiah).
+  final String Function(double value)? format;
+
+  String _fmt(double v) => format != null ? format!(v) : Fmt.rupiah(v.round());
 
   final List<double> values;
   final List<String> labels;
@@ -30,24 +36,25 @@ class SimpleBarChart extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (maxValue > 0)
-          Text('Tertinggi ${Fmt.rupiah(maxValue.round())}',
+          Text('Tertinggi ${_fmt(maxValue)}',
               style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
         const SizedBox(height: 6),
         SizedBox(
           height: height,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (int i = 0; i < values.length; i++)
                 Expanded(
                   child: Tooltip(
-                    message: '${labels[i]}: ${Fmt.rupiah(values[i].round())}',
+                    message: '${labels[i]}: ${_fmt(values[i])}',
                     child: Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: values.length > 20 ? 1 : 3),
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: FractionallySizedBox(
+                          widthFactor: 1,
                           heightFactor: maxValue > 0
                               ? (values[i] / maxValue).clamp(0.0, 1.0) * 0.95 +
                                   0.02

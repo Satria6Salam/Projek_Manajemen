@@ -165,6 +165,7 @@ class _ModelReportScreenState extends State<ModelReportScreen> {
                       m.label.split(' ').first.substring(0, 3)
                   ],
                   height: 110,
+                  format: (v) => '${v.round()}%',
                 ),
                 _title('Per kategori prediksi'),
                 for (final c in r.categories) _accRow(c),

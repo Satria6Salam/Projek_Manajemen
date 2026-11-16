@@ -133,6 +133,11 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """URL database; path SQLite relatif diubah menjadi absolut."""
         url = self.DATABASE_URL
+        # Penyedia cloud (Render/Heroku) memberi "postgres://" atau "postgresql://";
+        # backend memakai driver psycopg 3.
+        for raw_prefix in ("postgres://", "postgresql://"):
+            if url.startswith(raw_prefix):
+                return "postgresql+psycopg://" + url[len(raw_prefix):]
         prefix = "sqlite:///"
         if url.startswith(prefix) and not url.startswith("sqlite:////") and ":memory:" not in url:
             raw = url[len(prefix):]
