@@ -134,6 +134,10 @@ class _ScannerScreenState extends State<ScannerScreen>
       paperFill: quality.paperFill,
     );
     if (!verdict.retake) return;
+    if (verdict.mustRetake) {
+      await _forceRetakeDialog(verdict.reasons);
+      return;
+    }
     final retake = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -299,9 +303,87 @@ class _ScannerScreenState extends State<ScannerScreen>
   // Proses: OCR -> parsing -> klasifikasi -> halaman validasi
   // --------------------------------------------------------------------------
 
+  /// Foto terlalu buram/gelap untuk dibaca: tidak diproses, minta foto ulang.
+  Future<void> _forceRetakeDialog(List<String> reasons) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Foto buram, silakan foto ulang'),
+        content: Text(
+          'Terdeteksi: ${reasons.join(', ')}. Tulisan tidak bisa dibaca dengan benar '
+          '(tanggal, harga, dan total bisa salah).\n\n'
+          'Tahan HP diam sampai indikator hijau, pastikan cahaya cukup, '
+          'dan dekatkan HP sampai struk memenuhi bingkai.',
+        ),
+        actions: [
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Foto ulang')),
+        ],
+      ),
+    );
+    if (mounted) _retake();
+  }
+
+  /// Hasil baca tanpa tanggal/total dari foto yang agak buram: tawarkan foto ulang.
+  Future<bool> _offerRetakeForMissing(ParsedReceipt parsed, String path) async {
+    final missing = <String>[
+      if (parsed.transactionDate == null) 'tanggal',
+      if (parsed.totalAmount == null) 'total',
+    ];
+    if (missing.isEmpty || _inBatch) return false;
+    final quality = await _enhancer.assess(path);
+    if (quality == null || !mounted) return false;
+    if (!quality.isBlurry && !quality.isDark && !quality.isFaded) return false;
+    final retake = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sebagian data tidak terbaca'),
+        content: Text(
+          '${missing.join(' dan ')} tidak terbaca karena ${quality.notes.join(', ')}. '
+          'Foto ulang agar hasilnya lengkap?',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Isi manual')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Foto ulang')),
+        ],
+      ),
+    );
+    if (retake == true && mounted) {
+      setState(() => _processing = false);
+      _retake();
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _useCaptured() async {
     final path = _captured?.path;
     if (path == null) return;
+
+    // Foto terlalu buram: jangan dibaca (hasilnya pasti salah), minta foto ulang.
+    if (!_inBatch) {
+      final quality = await _enhancer.assess(path);
+      if (!mounted) return;
+      if (quality != null) {
+        final verdict = CaptureVerdict.judge(
+          blurLevel: quality.blurLevel,
+          isDark: quality.isDark,
+          brightness: quality.brightness,
+          glareRatio: quality.glareRatio,
+          paperFill: quality.paperFill,
+        );
+        if (verdict.mustRetake) {
+          await _forceRetakeDialog(verdict.reasons);
+          return;
+        }
+      }
+    }
 
     setState(() {
       _processing = true;
@@ -329,6 +411,7 @@ class _ScannerScreenState extends State<ScannerScreen>
     final ServerScan? server = await _tryServerScan(path, deviceText);
     if (!mounted) return;
     if (server != null) {
+      if (await _offerRetakeForMissing(server.parsed, path)) return;
       await _goToValidation(
         imagePath: path,
         rawText: server.rawText,
@@ -397,6 +480,8 @@ class _ScannerScreenState extends State<ScannerScreen>
           'atau isi data secara manual.');
       return;
     }
+    if (await _offerRetakeForMissing(reading.parsed, path)) return;
+    if (!mounted) return;
     await _goToValidation(
       imagePath: path,
       rawText: reading.rawText,

@@ -552,7 +552,36 @@ class ReceiptParser {
     return null;
   }
 
-  static DateTime? _parseDate(String line) {
+  static final RegExp _dateLike = RegExp(
+      r'(?<![A-Za-z])[\dOolI|SB]{1,4}(?:\s*[/.\-]\s*[\dOolI|SB]{1,4}){2}(?![A-Za-z])');
+  static final RegExp _monthFirstDate =
+      RegExp(r'\b([A-Za-z]{3,9})\.?\s*(\d{1,2}),?\s+(\d{2,4})\b');
+  static final RegExp _labelledBareDate = RegExp(
+      r'\b(?:tgl|tanggal|date|tg1)\b\.?\s*[:.]?\s*(\d{2}\s?\d{2}\s?(?:\d{4}|\d{2}))\b',
+      caseSensitive: false);
+
+  /// Rapikan salah baca OCR pada tanggal: "1O/l0/2O26" -> "10/10/2026",
+  /// "19 / 10 / 2026" -> "19/10/2026".
+  static String normalizeDateText(String line) =>
+      line.replaceAllMapped(_dateLike, (m) {
+        const fix = {
+          'O': '0',
+          'o': '0',
+          'l': '1',
+          'I': '1',
+          '|': '1',
+          'S': '5',
+          'B': '8'
+        };
+        return m[0]!
+            .split('')
+            .map((c) => fix[c] ?? c)
+            .join()
+            .replaceAll(RegExp(r'\s+'), '');
+      });
+
+  static DateTime? _parseDate(String rawLine) {
+    final line = normalizeDateText(rawLine);
     final iso = _isoDate.firstMatch(line);
     if (iso != null) {
       return _validDate(int.parse(iso.group(1)!), int.parse(iso.group(2)!),
@@ -571,8 +600,28 @@ class ReceiptParser {
     if (numeric != null) {
       var year = int.parse(numeric.group(3)!);
       if (year < 100) year += 2000;
-      return _validDate(
+      final d = _validDate(
           year, int.parse(numeric.group(2)!), int.parse(numeric.group(1)!));
+      if (d != null) return d;
+    }
+    final monthFirst = _monthFirstDate.firstMatch(line);
+    if (monthFirst != null) {
+      final name = monthFirst.group(1)!.toLowerCase();
+      final month = _monthByPrefix[name.substring(0, 3)];
+      if (month != null) {
+        var year = int.parse(monthFirst.group(3)!);
+        if (year < 100) year += 2000;
+        final d = _validDate(year, month, int.parse(monthFirst.group(2)!));
+        if (d != null) return d;
+      }
+    }
+    final bare = _labelledBareDate.firstMatch(line);
+    if (bare != null) {
+      final digits = bare.group(1)!.replaceAll(RegExp(r'\s'), '');
+      var year = int.parse(digits.substring(4));
+      if (year < 100) year += 2000;
+      return _validDate(year, int.parse(digits.substring(2, 4)),
+          int.parse(digits.substring(0, 2)));
     }
     return null;
   }

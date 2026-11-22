@@ -160,3 +160,19 @@ def test_classify_endpoint(client, auth):
     r = client.post("/api/v1/classify", json={"texts": ["PEPSODENT 190G", "AQUA 600ML"]}, headers=auth)
     keys = [x["category"]["key"] for x in r.json()]
     assert keys == ["Perawatan_Diri", "Minuman"]
+
+
+def test_date_ocr_misreads():
+    from datetime import datetime
+
+    from app.integrations.parser.regex_parser import RegexReceiptParser
+
+    parser = RegexReceiptParser()
+    for line, expected in [
+        ("Tgl: 19/1O/2O26 11:19", datetime(2026, 10, 19, 11, 19)),
+        ("19 / 10 / 2026", datetime(2026, 10, 19)),
+        ("Okt 19, 2026", datetime(2026, 10, 19)),
+        ("Tanggal : 19 10 2026", datetime(2026, 10, 19)),
+    ]:
+        parsed = parser.parse(f"TOKO MAJU\n{line}\nTEH 5.000\nTOTAL 5.000")
+        assert parsed.transaction_date == expected, line

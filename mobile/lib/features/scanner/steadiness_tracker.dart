@@ -62,9 +62,13 @@ class _Sample {
 
 /// Keputusan setelah foto diambil: apakah sebaiknya foto ulang?
 class CaptureVerdict {
-  const CaptureVerdict({required this.retake, required this.reasons});
+  const CaptureVerdict(
+      {required this.retake, required this.reasons, this.mustRetake = false});
 
   final bool retake;
+
+  /// Foto terlalu buram untuk dibaca sama sekali: wajib foto ulang.
+  final bool mustRetake;
   final List<String> reasons;
 
   /// Foto sangat buram/goyang atau gelap berat -> sarankan foto ulang.
@@ -77,13 +81,17 @@ class CaptureVerdict {
     double paperFill = 1,
   }) {
     final reasons = <String>[
-      if (blurLevel >= 0.6) 'foto buram/goyang',
+      if (blurLevel >= 0.4) 'foto buram/goyang',
       if (isDark && brightness < 70) 'foto terlalu gelap',
       // Pantulan flash/lampu menghapus tulisan di bagian itu.
       if (glareRatio > 0.12) 'pantulan cahaya menutupi tulisan',
       // Struk hanya sebagian kecil bingkai: huruf terlalu kecil untuk dibaca.
       if (paperFill < 0.2) 'struk terlalu jauh / kecil di bingkai',
     ];
-    return CaptureVerdict(retake: reasons.isNotEmpty, reasons: reasons);
+    return CaptureVerdict(
+      retake: reasons.isNotEmpty,
+      reasons: reasons,
+      mustRetake: blurLevel >= 0.6 || (isDark && brightness < 45),
+    );
   }
 }

@@ -67,6 +67,13 @@ _DATE_TEXT = re.compile(
     r"\b(\d{1,2})\s*[-/ ]?\s*(jan|feb|mar|apr|mei|may|jun|jul|agu|agt|ags|aug|sep|okt|oct|nov|des|dec)[a-z]*\.?\s*[-/ ]?\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
+_DATE_TEXT_MONTH_FIRST = re.compile(
+    r"\b(jan|feb|mar|apr|mei|may|jun|jul|agu|agt|ags|aug|sep|okt|oct|nov|des|dec)[a-z]*\.?\s*(\d{1,2}),?\s+(\d{2,4})\b",
+    re.IGNORECASE,
+)
+_DATE_LABELLED_BARE = re.compile(
+    r"\b(?:tgl|tanggal|date|tg1)\b\.?\s*[:.]?\s*(\d{2}\s?\d{2}\s?(?:\d{4}|\d{2}))\b", re.IGNORECASE
+)
 _TIME = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\b")
 
 # Satuan di antara qty dan "x": "1 pcs x 4.500", "2 btl @ 3.000".
@@ -497,7 +504,9 @@ class RegexReceiptParser(ReceiptParser):
 
     @staticmethod
     def _has_date(line: str) -> bool:
-        return any(p.search(line) for p in _DATE_NUMERIC) or bool(_DATE_TEXT.search(line))
+        line = RegexReceiptParser._normalize_date_text(line)
+        return (any(p.search(line) for p in _DATE_NUMERIC) or bool(_DATE_TEXT.search(line))
+                or bool(_DATE_TEXT_MONTH_FIRST.search(line)) or bool(_DATE_LABELLED_BARE.search(line)))
 
     def _find_date(self, lines: list[str]) -> datetime | None:
         for index, line in enumerate(lines):
@@ -515,7 +524,20 @@ class RegexReceiptParser(ReceiptParser):
         return None
 
     @staticmethod
+    def _normalize_date_text(line: str) -> str:
+        """Rapikan salah baca OCR di sekitar tanggal: "1O/l0/2O26" -> "10/10/2026",
+        "19 / 10 / 2026" -> "19/10/2026", "19-10- 26" -> "19-10-26"."""
+        def digits(m: re.Match) -> str:
+            return m.group(0).translate(_DIGIT_FIX).replace("S", "5").replace("B", "8")
+
+        # Token berbentuk tanggal yang memuat huruf mirip angka.
+        line = re.sub(r"(?<![A-Za-z])[\dOolI|SB]{1,4}(?:\s*[/.\-]\s*[\dOolI|SB]{1,4}){2}(?![A-Za-z])",
+                      lambda m: re.sub(r"\s+", "", digits(m)), line)
+        return line
+
+    @staticmethod
     def _date_in_line(line: str) -> datetime | None:
+        line = RegexReceiptParser._normalize_date_text(line)
         candidates: list[tuple[int, int, int]] = []
         m = _DATE_NUMERIC[0].search(line)
         if m:
@@ -530,6 +552,16 @@ class RegexReceiptParser(ReceiptParser):
         m = _DATE_TEXT.search(line)
         if m:
             candidates.append((int(m.group(3)), _MONTHS[m.group(2).lower()[:3]], int(m.group(1))))
+        # Bulan di depan: "Okt 19, 2026", "Oct 19 26".
+        m = _DATE_TEXT_MONTH_FIRST.search(line)
+        if m:
+            candidates.append((int(m.group(3)), _MONTHS[m.group(1).lower()[:3]], int(m.group(2))))
+        # Berlabel tanpa pemisah: "Tgl 19102026", "Tanggal: 19 10 2026", "Date 191026".
+        m = _DATE_LABELLED_BARE.search(line)
+        if m:
+            d = re.sub(r"\s", "", m.group(1))
+            if len(d) in (6, 8):
+                candidates.append((int(d[4:]), int(d[2:4]), int(d[:2])))
         for year, month, day in candidates:
             if year < 100:
                 year += 2000
