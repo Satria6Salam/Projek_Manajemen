@@ -1,4 +1,5 @@
 import 'formatters.dart';
+import 'name_repairer.dart';
 
 /// Satu baris barang hasil parsing teks OCR.
 class ParsedItem {
@@ -7,9 +8,13 @@ class ParsedItem {
       this.unitPrice,
       this.priceCorrected = false,
       this.nameCorrected = false,
-      this.suspicious = false});
+      this.suspicious = false,
+      this.uncertainWords = const <String>[]});
 
   final String name;
+
+  /// Kata pada nama yang diragukan OCR (dikoreksi otomatis / tidak dikenal) -> disorot.
+  final List<String> uncertainWords;
 
   /// Harga total baris (qty x harga satuan).
   final double price;
@@ -132,10 +137,62 @@ class ReceiptParser {
   };
 
   /// Rapikan baris OCR: tanda "=", satuan "pcs", angka terpecah spasi, huruf mirip angka.
+  static final RegExp _gluedDateTime4 =
+      RegExp(r'\b(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4})(\d{1,2}:\d{2})');
+  static final RegExp _gluedDateTime2 =
+      RegExp(r'\b(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2})(\d{1,2}:\d{2})');
+  static final RegExp _thousands = RegExp(r'^\d{1,3}(?:[.,]\d{3})+$');
+
+  /// "x5@1.000" -> [x5, @, 1.000]; "x103.000" (x1 @3.000, @ terbaca 0) -> [x1, @, 3.000].
+  /// Bila ambigu, dipilih pemisahan yang qty x harga satuan = angka berikutnya.
+  static List<String>? _splitGluedQty(String token, String next) {
+    if (token.isEmpty || !'xX×'.contains(token[0])) return null;
+    final body = token.substring(1);
+    final options = <(int, String)>[];
+    for (var cut = 1; cut <= 3 && cut <= body.length; cut++) {
+      final q = body.substring(0, cut);
+      if (int.tryParse(q) == null) break;
+      final rest = body.substring(cut);
+      final units = rest.isNotEmpty && '@0'.contains(rest[0])
+          ? [rest.substring(1), rest]
+          : [rest];
+      for (final u in units) {
+        if (_thousands.hasMatch(u)) options.add((int.parse(q), u));
+      }
+    }
+    if (options.isEmpty) return null;
+    final following = next.isEmpty ? null : Fmt.parseAmount(next);
+    if (following != null) {
+      for (final (q, u) in options) {
+        final v = Fmt.parseAmount(u);
+        if (v != null && (q * v - following).abs() < 1) return ['x$q', '@', u];
+      }
+    }
+    return ['x${options.first.$1}', '@', options.first.$2];
+  }
+
   static String normalizeLine(String line) {
     final tokens = <String>[];
-    for (var token in line.trim().split(RegExp(r'\s+'))) {
+    // Tanggal & jam menempel: "19/10/2611:19" -> "19/10/26 11:19".
+    line = line
+        .trim()
+        .replaceAllMapped(_gluedDateTime4, (m) => '${m[1]} ${m[2]}')
+        .replaceAllMapped(_gluedDateTime2, (m) => '${m[1]} ${m[2]}');
+    final raw = line.split(RegExp(r'\s+'));
+    for (var pos = 0; pos < raw.length; pos++) {
+      var token = raw[pos];
       if (token == '=') continue;
+      final at = RegExp(r'^@(\d[\d.,]*)$').firstMatch(token);
+      if (at != null) {
+        tokens.addAll(['@', at.group(1)!]); // "@3.000": @ bukan angka 0
+        continue;
+      }
+      final glued =
+          _splitGluedQty(token, pos + 1 < raw.length ? raw[pos + 1] : '');
+      if (glued != null) {
+        tokens.addAll(glued);
+        continue;
+      }
       final m = RegExp(r'^([(\[:;]*)(.*?)([)\]:;]*)$').firstMatch(token)!;
       final core = m.group(2)!;
       if (_digitish.hasMatch(core)) {
@@ -182,6 +239,9 @@ class ReceiptParser {
     var numberedHeader = false;
     var qtyFirstHeader = false;
     String? pendingName;
+    String?
+        nameOnlyLine; // baris nama tanpa harga terakhir (untuk nama terpotong)
+    var nameOnlyIndex = -2;
     for (var index = 0; index < lines.length; index++) {
       final line = lines[index];
       final next = index + 1 < lines.length ? lines[index + 1] : '';
@@ -213,9 +273,13 @@ class ReceiptParser {
           RegExp(r'\d[.,]\d{3}').allMatches(line).isEmpty &&
           _isPriceOnly(next)) {
         // Kode barang (PLU/barcode) di depan nama ikut dibuang.
-        pendingName = line
+        final current = line
             .replaceAll(RegExp(r'^[\s\-:.*#|]+|[\s\-:.*#|]+$'), '')
             .replaceFirst(RegExp(r'^\d{4,}\s+'), '');
+        // Nama panjang terpotong ke baris ini ("PIN HEADER ... SINGLE R" + "OW 1X40 ...").
+        final prev = nameOnlyIndex == index - 1 ? nameOnlyLine : null;
+        pendingName =
+            prev != null && prev.length >= 24 ? '$prev $current' : current;
         previousWasItem = false;
         continue;
       }
@@ -225,6 +289,13 @@ class ReceiptParser {
         items.add(item);
         previousWasItem = true;
         continue;
+      }
+      if (!_isNonItem(line) &&
+          _parseDate(line) == null &&
+          _letters(line) >= 3 &&
+          !RegExp(r'\d[.,]\d{3}').hasMatch(line)) {
+        nameOnlyLine = line.trim();
+        nameOnlyIndex = index;
       }
       // Lanjutan nama barang di baris berikutnya (mis. "Lotus Biscoff" lalu
       // "Freshmilk"): baris pendek tanpa angka tepat setelah baris barang.
@@ -248,8 +319,27 @@ class ReceiptParser {
       merchantAddress: _findAddress(rawLines),
       transactionDate: _findDate(lines),
       totalAmount: _reconcileTotal(lines, cleanedItems, total),
-      items: _reconcileItems(lines, cleanedItems, total),
+      items: _repairNames(_reconcileItems(lines, cleanedItems, total)),
     );
+  }
+
+  /// Perbaikan ejaan offline (bila kosakata sudah dimuat) + tandai kata ragu.
+  static List<ParsedItem> _repairNames(List<ParsedItem> items) {
+    final repairer = NameRepairer.instance;
+    if (repairer == null) return items;
+    return [
+      for (final it in items)
+        () {
+          final fixed = repairer.repair(it.name);
+          return ParsedItem(fixed, it.price,
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              priceCorrected: it.priceCorrected,
+              nameCorrected: it.nameCorrected || fixed != it.name,
+              suspicious: it.suspicious,
+              uncertainWords: repairer.uncertainWords(fixed, it.name));
+        }()
+    ];
   }
 
   // ------------------------------------------------------------ konsistensi
@@ -535,10 +625,17 @@ class ReceiptParser {
     var end = tokens.length;
     final numbers = <String>[];
     int? qtyHint;
+    final qtyPrefix = RegExp(r'^[xX×](\d{1,3})$'); // "x5" = qty 5
     while (end > 0 &&
         (_numberToken.hasMatch(tokens[end - 1]) ||
-            _qtySign.hasMatch(tokens[end - 1]))) {
+            _qtySign.hasMatch(tokens[end - 1]) ||
+            qtyPrefix.hasMatch(tokens[end - 1]))) {
       end--;
+      final qp = qtyPrefix.firstMatch(tokens[end]);
+      if (qp != null) {
+        qtyHint = int.parse(qp.group(1)!);
+        continue;
+      }
       if (_qtySign.hasMatch(tokens[end])) {
         // "2 x 5,200": angka kecil sebelum tanda x adalah qty.
         if (end > 0 && RegExp(r'^\d{1,3}$').hasMatch(tokens[end - 1])) {

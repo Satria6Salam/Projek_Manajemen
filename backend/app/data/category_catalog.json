@@ -37,6 +37,13 @@
       "color": "#EF4444"
     },
     {
+      "key": "Elektronik",
+      "display_name": "Elektronik",
+      "description": "Barang elektronik, komponen, kabel, lampu, dan aksesoris gawai",
+      "icon": "devices",
+      "color": "#F59E0B"
+    },
+    {
       "key": "Lainnya",
       "display_name": "Lainnya",
       "description": "Pengeluaran di luar kategori utama",

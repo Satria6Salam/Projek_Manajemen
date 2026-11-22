@@ -1,0 +1,104 @@
+# Kosakata umum nama barang di struk (Indonesia + Inggris), satu kata per baris atau dipisah spasi.
+# Dipakai perbaikan ejaan hasil OCR: kata yang dikenal tidak "diperbaiki" menjadi kata lain,
+# dan kata salah eja dicocokkan ke kata terdekat di sini. Tambahkan kata baru sesuai kebutuhan.
+
+# --- ukuran, satuan, bentuk
+ukuran kecil besar sedang mini jumbo panjang pendek lebar tebal tipis tinggi rendah bulat kotak persegi
+meter centimeter milimeter liter mililiter gram kilogram ons lusin kodi rim pak pack pcs buah biji batang
+lembar gulung roll set pasang unit isi refill sachet botol kaleng dus kardus karton bungkus plastik
+single double triple dual multi row baris kolom strip lapis susun
+
+# --- warna & sifat
+warna hitam putih merah biru hijau kuning ungu oranye jingga coklat abu pink silver emas gold transparan bening
+black white red blue green yellow purple orange brown grey gray clear warna-warni campur polos motif
+baru original asli premium standar standard super ekstra extra spesial special murah hemat kuat tahan
+female male jantan betina panas dingin cair padat lembut halus kasar
+
+# --- elektronik & komponen
+kabel listrik elektronik elektronika serabut tembaga timah solder flux pasta header pin socket soket
+konektor connector jumper resistor kapasitor capacitor dioda diode transistor led lampu bohlam saklar
+stop kontak steker colokan adaptor adapter charger baterai battery aki modul module sensor relay
+arduino esp mikrokontroler board pcb breadboard motor servo dinamo kipas fan speaker earphone headset
+mouse keyboard flashdisk memori memory card kartu usb hdmi type micro mini power supply volt watt ampere
+ohm mah watt fuse sekring isolasi selotip lakban heatshrink terminal klem jack audio video antena
+remote baterai senter lampu kabel roll ties tis
+
+# --- perkakas & bangunan
+obeng tang palu gergaji bor mata kunci pas sok baut mur paku sekrup ring engsel gembok cat kuas
+amplas lem perekat silikon semen pasir pipa kran keran selang ember sapu pel sikat lap kain tali
+kawat besi baja aluminium kayu triplek seng genteng keramik meteran waterpass cutter pisau gunting
+
+# --- alat tulis & kantor
+buku tulis pulpen pena pensil penghapus rautan penggaris spidol stabilo kertas hvs map amplop
+stapler isi staples klip binder lakban selotip tinta printer toner kalkulator agenda nota kwitansi
+
+# --- otomotif
+oli busi ban dalam luar rantai gir kampas rem filter udara aki helm spion knalpot shock bensin
+pertalite pertamax solar
+
+# --- pakaian & rumah tangga
+baju kaos celana kemeja jaket kaus kaki sandal sepatu topi handuk sprei bantal guling selimut
+piring gelas mangkok sendok garpu panci wajan teflon termos rantang toples tisu serbet
+
+# --- makanan & minuman umum
+nasi ayam goreng bakar rebus kukus sapi kambing ikan udang cumi telur tahu tempe sayur sambal kecap
+saus sirup susu kopi teh jus air mineral es manis tawar asin pedas gurih roti kue biskuit wafer
+coklat keju mentega gula garam tepung beras minyak mie bihun bumbu kerupuk keripik snack permen
+buah apel jeruk pisang mangga semangka anggur melon pepaya
+
+# --- kata ulang / berstrip
+warna-warni sayur-mayur lauk-pauk buah-buahan kacang-kacangan rempah-rempah bumbu-bumbu serba-serbi
+anak-anak kue-kue mainan-mainan alat-alat bahan-bahan macam-macam
+
+# --- merek minimarket: makanan & minuman
+indomie sarimi supermi mie sedaap sedap gaga lemonilo pop mie popmie samyang nissin
+aqua lemineral ades cleo vit prima club nestle pure life
+teh botol sosro pucuk harum fruit tea frestea ichi ocha javana nu green tea kotak
+coca cola fanta sprite pepsi big cola mountain dew pocari sweat mizone hydro coco isoplus
+yakult cimory ultra ultramilk frisian flag bendera indomilk diamond greenfields bear brand
+dancow milo ovaltine energen kapal api abc kopi good day luwak white koffie nescafe torabika top
+golda kopiko tora café cafe latte cappuccino espresso americano mocha
+chitato lays qtela taro chiki potabee kusuka maicih jetz cheetos doritos pringles
+oreo roma malkist regal marie khong guan monde nissin wafer tango beng richeese nabati
+superstar gery chocolatos beryls silverqueen cadbury delfi toblerone kitkat
+better biskuat timtam hatari selamat nextar fullo slai olai
+sari roti mr bread roti o rotio holland
+kecap bango sedaap abc saus sambal indofood heinz del monte royco masako sasa ajinomoto
+bimoli filma sunco tropical fortune sania minyakita rose brand segitiga biru kunci bogasari
+blue band palmia wijsman prochiz kraft
+sosis kanzler champ belfoods so good fiesta bernardi
+walls campina aice glico paddle pop magnum cornetto
+# --- merek minimarket: kebutuhan rumah & perawatan diri
+rinso attack daia so klin soklin molto downy kispray royale
+sunlight mama lemon mama lime wipol vixal porstex harpic bayclin super pell
+baygon hit autan soffell vape mortein stella glade
+lifebuoy lux nuvo dettol giv shinzui biore citra marina vaseline nivea
+pantene sunsilk clear dove head shoulders zinc emeron lifebuoy tresemme makarizo
+pepsodent ciptadent close up formula sensodyne colgate oral
+gillette tiger wardah emina pixy viva ponds garnier hada labo safi scarlett
+laurier charm softex kotex hers protect mamypoko sweety merries pampers makuku goon
+paseo tessa nice see u
+# --- apotek & kesehatan
+paracetamol panadol bodrex paramex sanmol tempra proris oskadon neozep decolgen
+mixagrip procold inza ultraflu konidin vicks komix obh combi woods siladex
+promag mylanta polysilane antangin tolak angin entrostop diapet norit
+betadine hansaplast handyplast rivanol minyak kayu putih telon caplang cap lang
+counterpain freshcare geliga balsem salonpas koyo insto rohto
+vitamin enervon cdr redoxon imboost sangobion blackmores becom zevit
+amoxicillin antasida ibuprofen asam mefenamat cetirizine ctm dexamethasone
+tablet kapsul kaplet sirup salep krim tetes masker alkohol kasa plester
+# --- rumah makan, kafe, restoran
+nasi goreng mie ayam bakso soto rawon pecel lalapan penyetan geprek crispy katsu teriyaki
+rendang gulai opor sate satai bebek lele nila gurame bandeng tongkol
+capcay fuyunghai kwetiau bihun lontong ketupat gado tahu tek campur rames
+es teh jeruk kelapa muda alpukat cincau dawet degan lemon tea milk shake boba
+paket hemat combo porsi ekstra extra level tambahan topping kerupuk
+dine in take away takeaway delivery ppn pb1 pajak service charge servis
+# --- spbu & otomotif
+pertamina pertalite pertamax turbo dexlite solar biosolar shell super vpower
+liter nozzle pompa
+yamalube federal enduro top1 shell advance mpx ahm
+# --- toko bangunan & listrik (merek)
+philips panasonic hannochs osram broco uticon eterna supreme kabel nym nyy
+avian nippon paint dulux mowilex vinilex no drop
+rucika wavin maspion tekiro kenmaster krisbow bosch makita

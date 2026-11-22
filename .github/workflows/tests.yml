@@ -21,7 +21,7 @@ jobs:
         working-directory: .
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-ind tesseract-ocr-eng fonts-dejavu-core
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-ind tesseract-ocr-eng fonts-dejavu-core libgl1 libglib2.0-0
           tesseract --version
       - uses: actions/setup-python@v5
         with:

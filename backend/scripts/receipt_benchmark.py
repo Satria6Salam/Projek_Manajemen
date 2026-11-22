@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
 import json
 import random
 import re
@@ -334,7 +335,9 @@ def score(gt: dict, parsed, seconds: float) -> Score:
             used.add(best_i)
             p = preds[best_i]
             s.names_found += 1
-            name_ok = best >= 0.85  # nama harus nyaris sama (tanpa sisa qty/nomor/angka harga)
+            # Nama harus nyaris sama (tanpa sisa qty/nomor/angka harga), kecuali foto HP asli
+            # yang kunci jawabannya hanya menilai angka (check_names: false).
+            name_ok = best >= 0.85 or gt.get("check_names") is False
             if p.price is not None and abs(p.price - g["price"]) < 1 and name_ok:
                 s.items_correct += 1
             elif not name_ok:
@@ -383,7 +386,8 @@ def _worker_init():
     from app.core.config import settings
     from app.integrations.ocr.tesseract import TesseractOCR
     from app.integrations.parser.regex_parser import RegexReceiptParser
-    _ENGINE = (TesseractOCR(settings.TESSERACT_CMD, settings.OCR_LANG, settings.OCR_PSM), RegexReceiptParser())
+    from app.integrations.providers import OCR_REGISTRY
+    _ENGINE = (OCR_REGISTRY[os.environ.get("BENCH_OCR", settings.OCR_ENGINE)](), RegexReceiptParser())
 
 
 def run_case(case: dict) -> dict:

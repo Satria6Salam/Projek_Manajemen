@@ -83,4 +83,32 @@ void main() {
         'TOKO A\nGula 1kg 16.000\nRoti Tawar 13.000\nTotal 34.000');
     expect(r.items.map((i) => i.priceCorrected).toList(), [false, true]);
   });
+
+  test(
+      'struk foto HP: tanggal-jam menempel, x5@1.000, nama terpotong (DigPart)',
+      () {
+    final r = ReceiptParser.parse('DigPart Malang-Pusat\n'
+        'JI.Joyosuko Metro Gg.2R No 60\n'
+        'Struk:492114EC 19/10/2611:19\n'
+        'Tuna\n'
+        'LUNAS\n'
+        'PIN HEADER FEMALE SIRIP SINULER\n'
+        'OW1X402.54MMBLACKHITAM\n'
+        'x103.000 3.000\n'
+        'Timah Soluer Paragon 10 Metei\n'
+        'x1@30.000 30.000\n'
+        'Kabel tistrik Elektronika Serab\n'
+        't Kecfi Ukuran 1fu10 Warna-warm\n'
+        'x5@1.000 5.000\n'
+        'Subtotal 38.000\n'
+        'Total(7) 38.000\n'
+        'Bayar 50.000\n'
+        'Kembali 12.000');
+    expect(r.transactionDate, DateTime(2026, 10, 19));
+    expect(r.totalAmount, 38000);
+    expect(r.items.map((i) => (i.quantity, i.price)).toList(),
+        [(1, 3000.0), (1, 30000.0), (5, 5000.0)]);
+    expect(r.items.first.name, startsWith('PIN HEADER'));
+    expect(r.items.last.name, startsWith('Kabel'));
+  });
 }

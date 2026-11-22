@@ -266,5 +266,28 @@
         "price": 7500
       }
     ]
+  },
+  "digpart_foto_hp.jpg": {
+    "merchant": "DigPart Malang",
+    "date": "2026-10-19",
+    "total": 38000,
+    "check_names": false,
+    "items": [
+      {
+        "name": "PIN HEADER FEMALE STRIP SINGLE ROW 1X40 2.54MM BLACK HITAM",
+        "qty": 1,
+        "price": 3000
+      },
+      {
+        "name": "Timah Solder Paragon 10 Meter",
+        "qty": 1,
+        "price": 30000
+      },
+      {
+        "name": "Kabel Listrik Elektronika Serabut Kecil Ukuran 1x10 Warna-warni",
+        "qty": 5,
+        "price": 5000
+      }
+    ]
   }
 }

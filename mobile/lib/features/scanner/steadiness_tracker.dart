@@ -73,10 +73,16 @@ class CaptureVerdict {
     required double blurLevel,
     required bool isDark,
     required double brightness,
+    double glareRatio = 0,
+    double paperFill = 1,
   }) {
     final reasons = <String>[
       if (blurLevel >= 0.6) 'foto buram/goyang',
       if (isDark && brightness < 70) 'foto terlalu gelap',
+      // Pantulan flash/lampu menghapus tulisan di bagian itu.
+      if (glareRatio > 0.12) 'pantulan cahaya menutupi tulisan',
+      // Struk hanya sebagian kecil bingkai: huruf terlalu kecil untuk dibaca.
+      if (paperFill < 0.2) 'struk terlalu jauh / kecil di bingkai',
     ];
     return CaptureVerdict(retake: reasons.isNotEmpty, reasons: reasons);
   }

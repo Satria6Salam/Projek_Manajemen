@@ -29,9 +29,13 @@ def norm_key(text: str | None) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", (text or "").lower())).strip()[:255]
 
 
-def snapshot(parsed: ParsedReceipt, raw_text: str = "") -> str:
+def snapshot(parsed: ParsedReceipt, raw_text: str = "", source: str | None = None,
+             candidates: list[dict] | None = None) -> str:
     return json.dumps({
         "raw_text": raw_text,
+        # Mesin OCR yang dipakai + ringkasan semua mesin, untuk membandingkan ML Kit/RapidOCR/Tesseract.
+        "source": source,
+        "candidates": candidates or [],
         "merchant": parsed.merchant_name,
         "date": parsed.transaction_date.isoformat() if parsed.transaction_date else None,
         "total": parsed.total_amount,
@@ -40,25 +44,94 @@ def snapshot(parsed: ParsedReceipt, raw_text: str = "") -> str:
 
 
 # ------------------------------------------------------------------ terapkan
+STORE_MERCHANT_SIMILARITY = 0.88  # "INDOMARET JL SOEKARN0" ~ "Indomaret Jl Soekarno"
+STORE_ITEM_SIMILARITY = 0.78      # nama barang mirip barang yang pernah dibeli di toko itu
+STORE_ITEM_SIMILARITY_SAME_PRICE = 0.6
+STORE_HISTORY_LIMIT = 400
+
+
+def _ratio(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _best(key: str, options: dict[str, str], threshold: float) -> str | None:
+    best, best_score = None, threshold
+    for k, value in options.items():
+        score = _ratio(key, k)
+        if score >= best_score:
+            best, best_score = value, score
+    return best
+
+
+def _store_history(db: Session, user_id: int, merchant: str | None) -> tuple[str | None, list[tuple[str, float | None]]]:
+    """Nama toko yang pernah disimpan pengguna yang paling mirip, beserta barang-barang yang pernah
+    dibeli di toko itu (nama sudah dikoreksi pengguna) dan harganya."""
+    from app.models import Receipt, ReceiptItem
+
+    key = norm_key(merchant)
+    if not key:
+        return None, []
+    names = db.scalars(
+        select(Receipt.merchant_name).where(Receipt.user_id == user_id, Receipt.merchant_name.is_not(None)).distinct()
+    ).all()
+    by_key = {norm_key(n): n for n in names if norm_key(n)}
+    store = by_key.get(key) or _best(key, by_key, STORE_MERCHANT_SIMILARITY)
+    if store is None:
+        return None, []
+    rows = db.execute(
+        select(ReceiptItem.item_name, ReceiptItem.item_price)
+        .join(Receipt, Receipt.id == ReceiptItem.receipt_id)
+        .where(Receipt.user_id == user_id, Receipt.merchant_name == store)
+        .order_by(Receipt.id.desc())
+        .limit(STORE_HISTORY_LIMIT)
+    ).all()
+    return store, [(r[0], float(r[1]) if r[1] is not None else None) for r in rows if r[0]]
+
+
 def apply_corrections(db: Session, user_id: int, parsed: ParsedReceipt) -> int:
-    """Terapkan koreksi yang pernah dibuat pengguna. Mengembalikan jumlah perubahan."""
+    """Terapkan yang pernah dipelajari dari pengguna. Mengembalikan jumlah perubahan.
+
+    1. Kamus koreksi (nama toko / nama barang per toko), cocok persis atau sangat mirip.
+    2. Ingatan per toko: nama toko disamakan dengan toko yang pernah disimpan, dan nama barang
+       yang mirip barang yang pernah dibeli di toko itu memakai nama yang sudah benar.
+    """
     rows = db.scalars(select(OcrCorrection).where(OcrCorrection.user_id == user_id)).all()
-    if not rows:
-        return 0
     merchants = {r.ocr_key: r.corrected for r in rows if r.kind == "merchant"}
     items: dict[tuple[str, str], str] = {(r.scope, r.ocr_key): r.corrected for r in rows if r.kind == "item"}
     changed = 0
     key = norm_key(parsed.merchant_name)
-    if key and key in merchants:
-        parsed.merchant_name = merchants[key]
+    fixed_merchant = (merchants.get(key) or _best(key, merchants, 0.88)) if key else None
+    if fixed_merchant and fixed_merchant != parsed.merchant_name:
+        parsed.merchant_name = fixed_merchant
         changed += 1
+
+    store, history = _store_history(db, user_id, parsed.merchant_name)
+    if store and store != parsed.merchant_name:
+        parsed.merchant_name = store
+        changed += 1
+
     scope = norm_key(parsed.merchant_name)
+    scoped = {k: v for (sc, k), v in items.items() if sc == scope}
+    history_names = {norm_key(n): n for n, _ in history}
     for item in parsed.items:
         k = norm_key(item.name)
-        fixed = items.get((scope, k)) or items.get(("", k))
+        if not k:
+            continue
+        fixed = items.get((scope, k)) or items.get(("", k)) or _best(k, scoped, 0.88)
+        if not fixed and history and k not in history_names:
+            best, best_score = None, 0.0
+            for name, price in history:
+                same_price = price is not None and item.price is not None and abs(price - item.price) < 1
+                score = _ratio(k, norm_key(name))
+                threshold = STORE_ITEM_SIMILARITY_SAME_PRICE if same_price else STORE_ITEM_SIMILARITY
+                if score >= threshold and score + (0.2 if same_price else 0) > best_score:
+                    best, best_score = name, score + (0.2 if same_price else 0)
+            fixed = best
         if fixed and fixed != item.name:
             item.name = fixed
             item.name_corrected = True
+            # Nama dari ingatan pengguna sudah pasti benar -> tidak perlu disorot.
+            item.uncertain_words = []
             changed += 1
     return changed
 

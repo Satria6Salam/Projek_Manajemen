@@ -21,6 +21,7 @@ from app.integrations.storage.base import StorageBackend
 from app.models import ScanAsset, User
 from app.schemas.scan import ScanItemOut, ScanOut
 from app.services import ocr_learning_service, prediction_service
+from app.integrations.providers import get_vision_extractor
 from app.services.receipt_reader import read_receipt
 
 logger = logging.getLogger("strukku")
@@ -67,7 +68,7 @@ def scan_receipt(
     image = load_image(content)
 
     try:
-        reading = read_receipt(image, ocr, parser, device_text=device_text)
+        reading = read_receipt(image, ocr, parser, device_text=device_text, vision=get_vision_extractor())
         ocr_result, raw_text, parsed = reading.ocr, reading.raw_text, reading.parsed
     except Exception as exc:
         logger.exception("OCR gagal")
@@ -99,7 +100,7 @@ def scan_receipt(
         owner_id=user.id,
         storage_key=scan_id,
         expires_at=utcnow() + timedelta(hours=settings.SCAN_ASSET_EXPIRE_HOURS),
-        ocr_snapshot=ocr_learning_service.snapshot(parsed, raw_text),
+        ocr_snapshot=ocr_learning_service.snapshot(parsed, raw_text, reading.label, reading.sources),
     ))
     db.commit()
     predictions = prediction_service.classify(db, user.id, [i.name for i in parsed.items], classifier)
@@ -115,6 +116,7 @@ def scan_receipt(
             price_corrected=item.price_corrected,
             name_corrected=item.name_corrected,
             suspicious=item.suspicious,
+            uncertain_words=item.uncertain_words,
             **prediction.model_dump(),
         )
         for index, (item, prediction) in enumerate(zip(parsed.items, predictions))

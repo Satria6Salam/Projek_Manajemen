@@ -130,6 +130,8 @@ class _ScannerScreenState extends State<ScannerScreen>
       blurLevel: quality.blurLevel,
       isDark: quality.isDark,
       brightness: quality.brightness,
+      glareRatio: quality.glareRatio,
+      paperFill: quality.paperFill,
     );
     if (!verdict.retake) return;
     final retake = await showDialog<bool>(
@@ -139,7 +141,8 @@ class _ScannerScreenState extends State<ScannerScreen>
         content: Text(
           'Terdeteksi: ${verdict.reasons.join(', ')}. Hasil baca struk bisa salah.\n\n'
           'Tips: tahan HP diam sampai indikator hijau, pastikan cahaya cukup '
-          '(nyalakan flash bila perlu), dan seluruh struk masuk bingkai.',
+          '(nyalakan flash bila perlu, tapi miringkan HP sedikit bila ada pantulan), '
+          'dan dekatkan HP sampai struk memenuhi bingkai.',
         ),
         actions: [
           TextButton(

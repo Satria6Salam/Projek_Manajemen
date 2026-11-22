@@ -72,10 +72,20 @@ class Settings(BaseSettings):
     LOW_CONFIDENCE_THRESHOLD: float = 0.7  # di bawah ini item ditandai "Periksa"
 
     # --- OCR ----------------------------------------------------------------
-    OCR_ENGINE: str = "tesseract"
+    OCR_ENGINE: str = "auto"  # auto (RapidOCR + cadangan Tesseract) | rapid | tesseract
     TESSERACT_CMD: str = ""  # kosong = cari tesseract di PATH
     OCR_LANG: str = "ind+eng"
     OCR_PSM: int = 4
+
+    # --- Pembacaan struk dengan Claude vision (Claude API) -------------------
+    # "claude" = foto struk dibaca Claude lebih dulu (perlu ANTHROPIC_API_KEY);
+    # "off" = hanya OCR lokal (Tesseract) + parser. Tanpa kunci API -> otomatis OCR lokal.
+    # Catatan privasi: bila aktif, foto struk dikirim ke Anthropic untuk diproses.
+    VISION_EXTRACTION: str = "off"
+    ANTHROPIC_API_KEY: str = ""
+    CLAUDE_VISION_MODEL: str = "claude-opus-5-5"
+    CLAUDE_VISION_EFFORT: str = "medium"  # low | medium | high | xhigh | max
+    CLAUDE_VISION_TIMEOUT_SECONDS: float = 60.0
 
     # --- Penyimpanan gambar -------------------------------------------------
     STORAGE_BACKEND: str = "local"

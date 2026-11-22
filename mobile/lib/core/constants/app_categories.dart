@@ -32,12 +32,15 @@ class AppCategories {
   static const String minuman = 'Minuman';
   static const String rumahTangga = 'Kebutuhan Rumah Tangga';
   static const String perawatanDiri = 'Perawatan Diri';
+  static const String elektronik = 'Elektronik';
 
   static const Map<String, String> descriptions = {
     makanan: 'Makanan, camilan, dan bahan pangan',
     minuman: 'Minuman kemasan, kopi, teh, susu, dan air mineral',
     rumahTangga: 'Perlengkapan kebersihan dan kebutuhan rumah sehari-hari',
     perawatanDiri: 'Produk kebersihan badan, kosmetik, dan perawatan diri',
+    elektronik:
+        'Barang elektronik, komponen, kabel, lampu, dan aksesoris gawai',
     fnb: 'Makanan, minuman, dan bahan pangan',
     kesehatan: 'Obat, vitamin, dan kebutuhan medis',
     transportasi: 'Ojek, taksi, BBM, dan angkutan umum',
@@ -56,6 +59,8 @@ class AppCategories {
         return const Color(0xFF60A5FA);
       case perawatanDiri:
         return const Color(0xFFA855F7);
+      case elektronik:
+        return const Color(0xFFF59E0B);
       case fnb:
         return const Color(0xFF2160DD);
       case transportasi:
@@ -80,6 +85,8 @@ class AppCategories {
         return Icons.home_outlined;
       case perawatanDiri:
         return Icons.spa_outlined;
+      case elektronik:
+        return Icons.devices_outlined;
       case kesehatan:
         return Icons.favorite_border;
       case transportasi:
@@ -129,6 +136,13 @@ class AppCategories {
           Icons.medication,
           Icons.healing,
           Icons.favorite
+        ];
+      case elektronik:
+        return const [
+          Icons.devices,
+          Icons.cable,
+          Icons.memory,
+          Icons.electrical_services
         ];
       case transportasi:
         return const [

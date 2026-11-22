@@ -8,7 +8,15 @@ class ImageQuality {
     required this.inkContrast,
     required this.lightUnevenness,
     required this.sharpness,
+    this.glareRatio = 0,
+    this.paperFill = 1,
   });
+
+  /// Porsi piksel yang "terbakar" putih (pantulan flash / lampu), 0-1.
+  final double glareRatio;
+
+  /// Porsi bingkai yang berisi kertas terang, 0-1 (kecil = struk terlalu jauh).
+  final double paperFill;
 
   /// Rata-rata kecerahan 0-255.
   final double brightness;
@@ -31,6 +39,8 @@ class ImageQuality {
   bool get isFaded => inkContrast < _fadedBelow;
   bool get hasShadow => lightUnevenness > _unevenAbove;
   bool get isBlurry => sharpness < _blurryBelow;
+  bool get hasGlare => glareRatio > 0.12;
+  bool get tooSmall => paperFill < 0.2;
 
   bool get hasIssue => isDark || isFaded || hasShadow || isBlurry;
 
@@ -44,6 +54,8 @@ class ImageQuality {
         if (isFaded) 'tulisan pudar',
         if (isDark) 'foto gelap',
         if (hasShadow && !isDark) 'ada bayangan',
+        if (hasGlare) 'ada pantulan cahaya',
+        if (tooSmall) 'struk terlalu jauh',
       ];
 }
 
@@ -90,9 +102,13 @@ class ImageEnhancer {
     final Float64List integral = Float64List((width + 1) * (height + 1));
     final Float64List source = Float64List(count);
     double brightnessSum = 0;
+    int saturated = 0;
+    int bright = 0;
     for (int i = 0; i < count; i++) {
       source[i] = gray[i].toDouble();
       brightnessSum += source[i];
+      if (gray[i] >= 252) saturated++;
+      if (gray[i] >= 150) bright++;
     }
 
     // 1. Redam noise.
@@ -136,6 +152,8 @@ class ImageEnhancer {
       inkContrast: inkContrast,
       lightUnevenness: backgroundHigh / math.max(backgroundLow, 1),
       sharpness: edge / math.max(inkContrast, 1),
+      glareRatio: saturated / count,
+      paperFill: bright / count,
     );
 
     // 3b. Pertajam bila buram: nilai + k * (nilai - rata-rata sekitar).

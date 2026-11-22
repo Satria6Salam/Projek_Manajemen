@@ -17,6 +17,7 @@ class ItemDraft {
     this.priceCorrected = false,
     this.nameCorrected = false,
     this.suspicious = false,
+    this.uncertainWords = const <String>[],
   })  : originalCategoryId = categoryId,
         nameCtl = TextEditingController(text: name),
         priceCtl =
@@ -55,8 +56,21 @@ class ItemDraft {
   /// Tampak janggal menurut server (harga tidak lazim / sisa angka di nama).
   final bool suspicious;
 
+  /// Kata yang diragukan OCR (dari server).
+  final List<String> uncertainWords;
+
+  /// Kata ragu yang masih ada di nama (hilang setelah pengguna membetulkannya).
+  List<String> get pendingWords {
+    final words = nameCtl.text.split(RegExp(r'\s+')).toSet();
+    return [
+      for (final w in uncertainWords)
+        if (words.contains(w)) w
+    ];
+  }
+
   /// Ada angka/nama yang diubah otomatis atau janggal -> tanda "cek struk".
-  bool get autoCorrected => priceCorrected || nameCorrected || suspicious;
+  bool get autoCorrected =>
+      priceCorrected || nameCorrected || suspicious || pendingWords.isNotEmpty;
 
   /// Nama terakhir yang sudah ditebak kategorinya (hindari tebakan berulang).
   String? guessedFor;

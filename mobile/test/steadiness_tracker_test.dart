@@ -43,4 +43,23 @@ void main() {
     expect(ok.retake, isFalse);
     expect(ok.reasons, isEmpty);
   });
+
+  test('pantulan cahaya dan struk terlalu jauh disarankan foto ulang', () {
+    final glare = CaptureVerdict.judge(
+        blurLevel: 0, isDark: false, brightness: 200, glareRatio: 0.3);
+    expect(glare.retake, isTrue);
+    expect(glare.reasons.single, contains('pantulan'));
+    final far = CaptureVerdict.judge(
+        blurLevel: 0, isDark: false, brightness: 90, paperFill: 0.1);
+    expect(far.reasons.single, contains('jauh'));
+    expect(
+        CaptureVerdict.judge(
+                blurLevel: 0,
+                isDark: false,
+                brightness: 200,
+                glareRatio: 0.05,
+                paperFill: 0.6)
+            .retake,
+        isFalse);
+  });
 }

@@ -100,13 +100,58 @@ _LEADING_QTY = re.compile(r"^(\d{1,2})\s*(?:[xX×]\s+|\s+)(?=[A-Za-z][A-Za-z.\-'
 _ML_FIX = re.compile(r"(?<=\d)\s?m[1I|]\b")
 
 
+_GLUED_DATETIME_4 = re.compile(r"\b(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4})(\d{1,2}:\d{2})")
+_GLUED_DATETIME_2 = re.compile(r"\b(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2})(\d{1,2}:\d{1,2})")
+_GLUED_QTY = re.compile(r"^[xX×](\d{1,3})[@0]?(\d{1,3}(?:[.,]\d{3})+)$")
+
+
+def _split_glued_qty(token: str, next_token: str) -> list[str] | None:
+    """"x5@1.000" -> ["x5", "@", "1.000"]; "x103.000" (x1 @3.000, @ terbaca 0) -> ["x1", "@", "3.000"].
+
+    Bila pemisahannya ambigu, dipilih yang qty x harga satuan = angka berikutnya di baris.
+    """
+    if not token[:1] in "xX×":
+        return None
+    body = token[1:]
+    options = []
+    for cut in range(1, min(3, len(body)) + 1):
+        qty, rest = body[:cut], body[cut:]
+        if not qty.isdigit():
+            break
+        for unit in (rest[1:], rest) if rest[:1] in "@0" else (rest,):
+            if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", unit or ""):
+                options.append((int(qty), unit))
+    if not options:
+        return None
+    following = parse_money(next_token) if next_token else None
+    if following is not None:
+        for qty, unit in options:
+            value = parse_money(unit)
+            if value is not None and abs(qty * value - following) < 1:
+                return [f"x{qty}", "@", unit]
+    qty, unit = options[0]
+    return [f"x{qty}", "@", unit]
+
+
 def normalize_line(line: str) -> str:
     """Rapikan satu baris OCR sebelum dibaca: spasi, angka terpecah, huruf yang mirip angka."""
     line = re.sub(r"\s+", " ", line).strip()
+    # Tanggal & jam menempel: "19/10/2611:19" -> "19/10/26 11:19".
+    line = _GLUED_DATETIME_4.sub(r"\1 \2", line)
+    line = _GLUED_DATETIME_2.sub(r"\1 \2", line)
+    raw_tokens = line.split(" ")
     tokens = []
-    for token in line.split(" "):
+    for pos, token in enumerate(raw_tokens):
         if token == "=":
             continue  # "1 x Rp 4.500 = Rp 4.500"
+        at = re.match(r"^@(\d[\d.,]*)$", token)
+        if at:
+            tokens.extend(["@", at.group(1)])  # "@3.000" = harga satuan, "@" bukan angka 0
+            continue
+        glued = _split_glued_qty(token, raw_tokens[pos + 1] if pos + 1 < len(raw_tokens) else "")
+        if glued:
+            tokens.extend(glued)
+            continue
         m = re.match(r"^([(\[:;]*)(.*?)([)\]:;]*)$", token)
         core = m.group(2)
         if _DIGITISH.match(core):
@@ -478,6 +523,10 @@ class RegexReceiptParser(ReceiptParser):
         m = _DATE_NUMERIC[1].search(line)
         if m:
             candidates.append((int(m.group(3)), int(m.group(2)), int(m.group(1))))
+        # Tahun 2 digit menempel dengan jam yang terpotong: "19/10/2611" -> 19/10/26.
+        m = re.search(r"\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2})\d{1,2}\b", line)
+        if m:
+            candidates.append((int(m.group(3)), int(m.group(2)), int(m.group(1))))
         m = _DATE_TEXT.search(line)
         if m:
             candidates.append((int(m.group(3)), _MONTHS[m.group(2).lower()[:3]], int(m.group(1))))
@@ -679,6 +728,7 @@ class RegexReceiptParser(ReceiptParser):
         pending_name: str | None = None
         numbered_header = False
         qty_first_header = False  # "Qty Nama Barang Harga Total": angka di depan = qty
+        pending_index = -2  # baris tempat pending_name terakhir diisi
         limit = stop_at if stop_at is not None else len(lines)
         for index, line in enumerate(lines[:limit]):
             next_line = lines[index + 1] if index + 1 < limit else ""
@@ -703,11 +753,14 @@ class RegexReceiptParser(ReceiptParser):
             # Nama barang yang diakhiri angka ukuran ("ABC SMBL ASLI 335") diikuti baris
             # harga tanpa nama ("2 x 12,700  25,400"): seluruh baris ini adalah nama.
             if _letters(name) >= 3 and len(numeric_tail) <= 1 and self._is_price_only(next_line):
-                pending_name = line.strip(" -:.*#|")
+                previous = pending_name if pending_index == index - 1 else None
+                current = line.strip(" -:.*#|")
                 if tail and tail[0].isdigit() and len(tail[0]) >= 6:
-                    pending_name = name  # kode barang di belakang, bukan bagian nama
+                    current = name  # kode barang di belakang, bukan bagian nama
                 # Kode barang (PLU/barcode) di depan nama: "8994330348 TEH BTL SOSRO".
-                pending_name = re.sub(r"^\d{4,}\s+", "", pending_name)
+                current = re.sub(r"^\d{4,}\s+", "", current)
+                pending_name = self._continue_name(previous, current)
+                pending_index = index
                 continue
             before = len(corrections) if corrections is not None else 0
             parsed = self._interpret_tail(tail, corrections) if tail else None
@@ -715,7 +768,12 @@ class RegexReceiptParser(ReceiptParser):
 
             if parsed is None:
                 # Baris tanpa harga: mungkin nama barang yang harganya di baris berikut.
-                pending_name = name if _letters(name) >= 3 else None
+                if _letters(name) >= 3:
+                    pending_name = self._continue_name(
+                        pending_name if pending_index == index - 1 else None, name)
+                    pending_index = index
+                else:
+                    pending_name = None
                 continue
 
             qty, unit, total, leftover = parsed
@@ -732,6 +790,17 @@ class RegexReceiptParser(ReceiptParser):
         if not qty_first_header:
             items = self._strip_row_numbers(items, numbered_header)
         return [self._leading_quantity(item) for item in items]
+
+    @staticmethod
+    def _continue_name(previous: str | None, current: str) -> str:
+        """Nama barang panjang terpotong ke baris berikutnya ("PIN HEADER ... SINGLE R" + "OW 1X40 ...").
+
+        Disambung hanya bila baris sebelumnya panjang (hampir selebar struk); baris pendek
+        seperti "Tunai" atau "LUNAS" bukan awal nama barang.
+        """
+        if previous and len(previous) >= 24:
+            return f"{previous} {current}"
+        return current
 
     @staticmethod
     def _leading_quantity(item: ParsedItem) -> ParsedItem:

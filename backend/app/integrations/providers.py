@@ -9,6 +9,7 @@ Semua fungsi `get_*` dipakai sebagai dependency FastAPI, sehingga di
 pengujian bisa diganti dengan `app.dependency_overrides`.
 """
 import json
+import re
 from collections import Counter
 from functools import lru_cache
 
@@ -29,8 +30,27 @@ from app.integrations.storage.base import StorageBackend
 from app.integrations.storage.local import LocalStorage
 from app.integrations.storage.supabase import SupabaseStorage
 
+def _tesseract() -> TesseractOCR:
+    return TesseractOCR(settings.TESSERACT_CMD, settings.OCR_LANG, settings.OCR_PSM)
+
+
+def _rapid():
+    from app.integrations.ocr.rapid import RapidOCREngine
+
+    return RapidOCREngine(tesseract=_tesseract())
+
+
+def _auto():
+    """RapidOCR (model PaddleOCR) bila terpasang, Tesseract sebagai cadangan; selain itu Tesseract."""
+    from app.integrations.ocr.rapid import rapidocr_available
+
+    return _rapid() if rapidocr_available() else _tesseract()
+
+
 OCR_REGISTRY = {
-    "tesseract": lambda: TesseractOCR(settings.TESSERACT_CMD, settings.OCR_LANG, settings.OCR_PSM),
+    "auto": _auto,
+    "rapid": _rapid,
+    "tesseract": _tesseract,
 }
 STORAGE_REGISTRY = {
     "local": lambda: LocalStorage(settings.path(settings.UPLOAD_DIR)),
@@ -69,12 +89,23 @@ def get_normalizer() -> TextNormalizer:
     joined: dict[str, str] = {}
     bigrams: set[str] = set()
     phrases: list[str] = []
-    for keywords in rules.get("categories", {}).values():
+    domains: dict[str, set[str]] = {}
+
+    def add_domain(text: str, domain: str) -> None:
+        for w in base.basic(text).split():
+            if w.isalpha() and len(w) >= 3:
+                domains.setdefault(w, set()).add(domain)
+
+    for category, keywords in rules.get("categories", {}).items():
         phrases.extend(keywords)
+        for keyword in keywords:
+            add_domain(keyword, category)
     phrases.extend(abbreviations.values())
     training = _read_json(settings.path(settings.TRAINING_ITEMS_PATH))
-    for items in training.get("categories", {}).values():
+    for category, items in training.get("categories", {}).items():
         phrases.extend(items)
+        for item in items:
+            add_domain(item, category)
     for phrase in phrases:
         words = base.basic(phrase).split()
         vocabulary.update(w for w in words if not w.isdigit())
@@ -85,7 +116,24 @@ def get_normalizer() -> TextNormalizer:
     for short in abbreviations:
         if " " not in short:
             vocabulary[short.lower()] += 1
-    return TextNormalizer(abbreviations, OcrTextRepairer(vocabulary, joined, bigrams))
+    # Kosakata umum (elektronik, perkakas, ATK, ukuran, warna, ...): kata sah seperti "ukuran"
+    # atau "strip" tidak boleh "diperbaiki" menjadi kata belanja ("cukuran", "sirup").
+    general = settings.path("app/data/general_vocabulary.txt")
+    hyphenated: set[str] = set()
+    if general.exists():
+        section = "umum"
+        for line in general.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("# ---"):
+                section = line.strip("# -").strip().lower()
+                continue
+            if line.strip().startswith("#"):
+                continue
+            hyphenated.update(re.findall(r"[a-z]+-[a-z]+", line.lower()))
+            for word in base.basic(line).split():
+                if word.isalpha() and len(word) >= 2:
+                    vocabulary[word] += 1
+            add_domain(line, section)
+    return TextNormalizer(abbreviations, OcrTextRepairer(vocabulary, joined, bigrams, domains, hyphenated))
 
 
 CLASSIFIER_REGISTRY = {
@@ -105,6 +153,22 @@ def _pick(registry: dict, key: str, label: str):
 @lru_cache
 def get_ocr_engine() -> OCREngine:
     return _pick(OCR_REGISTRY, settings.OCR_ENGINE, "OCR_ENGINE")
+
+
+@lru_cache
+def get_vision_extractor():
+    """Pembaca struk Claude vision, atau None bila dimatikan / tanpa kredensial Anthropic."""
+    if settings.VISION_EXTRACTION.strip().lower() != "claude":
+        return None
+    from app.integrations.vision.claude_extractor import ClaudeReceiptExtractor
+
+    extractor = ClaudeReceiptExtractor(
+        model=settings.CLAUDE_VISION_MODEL,
+        effort=settings.CLAUDE_VISION_EFFORT,
+        timeout=settings.CLAUDE_VISION_TIMEOUT_SECONDS,
+        api_key=settings.ANTHROPIC_API_KEY,
+    )
+    return extractor if extractor.configured() else None
 
 
 @lru_cache

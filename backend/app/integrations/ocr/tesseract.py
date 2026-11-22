@@ -61,6 +61,8 @@ class TesseractOCR(OCREngine):
         Kata-kata dikelompokkan lagi menurut posisi vertikalnya sehingga nama barang
         dan harganya kembali berada di satu baris.
         """
+        from app.integrations.ocr.layout import Box
+
         words = []
         confs: list[float] = []
         for i, raw in enumerate(data["text"]):
@@ -68,25 +70,16 @@ class TesseractOCR(OCREngine):
             if not word:
                 continue
             top, height = data["top"][i], max(data["height"][i], 1)
-            words.append((top + height / 2, data["left"][i], height, word))
+            left = data["left"][i]
+            words.append(Box(top + height / 2, left, left + data["width"][i], height, word))
             conf = float(data["conf"][i])
             if conf >= 0 and sum(ch.isalnum() for ch in word) >= 2:
                 confs.append(conf)
         if not words:
             return "", confs
-        heights = sorted(w[2] for w in words)
-        tolerance = 0.55 * heights[len(heights) // 2]
-        lines: list[list[tuple]] = []
-        centers: list[float] = []
-        for word in sorted(words):
-            if lines and abs(word[0] - centers[-1]) <= tolerance:
-                lines[-1].append(word)
-                centers[-1] = sum(w[0] for w in lines[-1]) / len(lines[-1])
-            else:
-                lines.append([word])
-                centers.append(word[0])
-        text = "\n".join(" ".join(w[3] for w in sorted(line, key=lambda w: w[1])) for line in lines)
-        return text, confs
+        from app.integrations.ocr.layout import layout_lines
+
+        return layout_lines(words, 0.55), confs
 
     def _read(self, prepared: Image.Image, psm: int, enhanced: bool) -> _Reading:
         data = pytesseract.image_to_data(
@@ -106,6 +99,10 @@ class TesseractOCR(OCREngine):
         image = ImageOps.exif_transpose(image)
         # Potong latar, luruskan perspektif, dan putar baris yang miring.
         image, geometry_steps = straighten(image)
+        # Foto HP 12 MP terlalu besar untuk Tesseract (lambat tanpa menambah ketajaman huruf).
+        if max(image.size) > 2400:
+            image = image.copy()
+            image.thumbnail((2400, 2400), Image.LANCZOS)
         quality: ImageQuality = measure(image)
         readings: list[tuple[str, _Reading]] = [("asli", self._read(self.preprocess(image), self.psm, enhanced=False))]
 

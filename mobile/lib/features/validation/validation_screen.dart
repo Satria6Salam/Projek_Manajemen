@@ -117,6 +117,7 @@ class _ValidationScreenState extends State<ValidationScreen> {
           priceCorrected: parsedItem.priceCorrected,
           nameCorrected: parsedItem.nameCorrected,
           suspicious: parsedItem.suspicious,
+          uncertainWords: parsedItem.uncertainWords,
         ));
       }
 
@@ -675,6 +676,15 @@ class _ValidationScreenState extends State<ValidationScreen> {
     ];
   }
 
+  /// Sorot (pilih) kata ragu di kolom nama supaya bisa langsung diketik ulang.
+  void _selectWord(ItemDraft item, String word) {
+    final text = item.nameCtl.text;
+    final start = text.indexOf(word);
+    if (start < 0) return;
+    item.nameCtl.selection =
+        TextSelection(baseOffset: start, extentOffset: start + word.length);
+  }
+
   Widget _buildItemCard(int index) {
     final item = _items[index];
     final warn = item.needsCheck || item.autoCorrected;
@@ -764,6 +774,11 @@ class _ValidationScreenState extends State<ValidationScreen> {
               ),
             ],
           ),
+          if (item.pendingWords.isNotEmpty)
+            _UncertainWords(
+              words: item.pendingWords,
+              onTap: (word) => _selectWord(item, word),
+            ),
           _QuantityRow(
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -967,6 +982,56 @@ class _QuantityRow extends StatelessWidget {
                     const TextStyle(fontSize: 12, color: AppColors.textGrey)),
           ),
       ],
+    );
+  }
+}
+
+/// Baris "Cek kata": kata pada nama barang yang diragukan hasil baca OCR.
+/// Ketuk kata untuk memilihnya di kolom nama lalu ketik ulang sesuai struk.
+class _UncertainWords extends StatelessWidget {
+  const _UncertainWords({required this.words, required this.onTap});
+
+  final List<String> words;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text('Cek kata:',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.warningText)),
+          for (final w in words)
+            InkWell(
+              key: ValueKey('uncertain-$w'),
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => onTap(w),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.warningBorder),
+                ),
+                child: Text(w,
+                    style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                        decorationStyle: TextDecorationStyle.wavy,
+                        decorationColor: AppColors.warningText,
+                        color: AppColors.navy)),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

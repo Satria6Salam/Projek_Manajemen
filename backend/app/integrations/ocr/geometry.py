@@ -52,9 +52,17 @@ def find_receipt(image: Image.Image) -> Image.Image | None:
     sx, sy = gray.width / small.width, gray.height / small.height
     # Haluskan agar tulisan di kertas tidak memecah area kertas.
     arr = np.asarray(small.filter(ImageFilter.GaussianBlur(3)), dtype=np.float32)
+    # Kejenuhan warna: kertas struk (dan bayangannya) hampir abu-abu murni,
+    # sedangkan latar seperti karpet, kain, atau meja kayu berwarna.
+    rgb_small = image.convert("RGB").resize(small.size, Image.BILINEAR).filter(ImageFilter.GaussianBlur(3))
+    arr_rgb = np.asarray(rgb_small, dtype=np.float32)
+    saturation = arr_rgb.max(axis=2) - arr_rgb.min(axis=2)
     threshold = _otsu(arr)
     paper = arr > threshold
-    if not paper.any() or paper.all() or arr[paper].mean() - arr[~paper].mean() < 35:
+    gray_paper = paper & (saturation < 30)
+    if gray_paper.mean() > 0.15 and saturation[~paper].mean() > saturation[gray_paper].mean() + 20:
+        paper = gray_paper  # latar terang tapi berwarna (karpet krem) tidak ikut dianggap kertas
+    if not paper.any() or paper.all() or arr[paper].mean() - arr[~paper].mean() < 25:
         return None  # kertas dan latar tidak cukup berbeda
     paper = ndimage.binary_closing(paper, structure=np.ones((9, 9)))
     paper = ndimage.binary_fill_holes(paper)
@@ -74,7 +82,10 @@ def find_receipt(image: Image.Image) -> Image.Image | None:
     inner_bg = ndimage.binary_erosion(~mask, iterations=6)
     inner_paper = ndimage.binary_erosion(mask, iterations=6)
     if inner_bg.any() and inner_paper.any():
-        if edges[inner_bg].mean() > 0.45 * max(edges[inner_paper].mean(), 1e-3):
+        # Latar berwarna (karpet, meja kayu, kain) jelas bukan bayangan di atas kertas,
+        # walau teksturnya ramai. Kertas struk & bayangannya hampir tak berwarna.
+        colored_background = saturation[inner_bg].mean() > saturation[inner_paper].mean() + 20
+        if not colored_background and edges[inner_bg].mean() > 0.45 * max(edges[inner_paper].mean(), 1e-3):
             return None
     ys, xs = np.nonzero(mask)
     # Struk yang menyentuh tiga sisi foto atau lebih = sudah dipotong pengguna.

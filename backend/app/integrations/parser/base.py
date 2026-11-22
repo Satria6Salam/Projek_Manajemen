@@ -15,6 +15,8 @@ class ParsedItem:
     name_corrected: bool = False
     # Tampak janggal (harga tidak lazim / ada sisa angka di nama) -> minta pengguna cek.
     suspicious: bool = False
+    # Kata yang diragukan (diubah otomatis atau tidak dikenal kosakata) -> disorot di layar cek.
+    uncertain_words: list[str] = field(default_factory=list)
 
 
 @dataclass

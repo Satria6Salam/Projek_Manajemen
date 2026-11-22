@@ -175,7 +175,11 @@ class FastApiReceiptRepository implements ReceiptRepository {
           unitPrice: unit,
           priceCorrected: m['price_corrected'] == true,
           nameCorrected: m['name_corrected'] == true,
-          suspicious: m['suspicious'] == true));
+          suspicious: m['suspicious'] == true,
+          uncertainWords: [
+            for (final w in (m['uncertain_words'] as List?) ?? const [])
+              if (w is String && w.isNotEmpty) w
+          ]));
       final cat = m['category'];
       predictions.add(ItemPrediction(
         itemName: name,

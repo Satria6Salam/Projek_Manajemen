@@ -11,7 +11,7 @@ import os
 import pytest
 
 from app.core.config import settings
-from app.integrations.ocr.tesseract import TesseractOCR
+from app.integrations.providers import get_ocr_engine
 from scripts.receipt_benchmark import build_cases, run_case, summarize
 
 # Batas minimum (diukur 22-11-2026, lalu diberi sedikit ruang).
@@ -24,7 +24,7 @@ CONDITIONS = ["clean", "photo", "blur_strong", "dark", "rotate", "motion_mild"]
 pytestmark = [
     pytest.mark.skipif(os.environ.get("RUN_SLOW") != "1", reason="uji lambat; set RUN_SLOW=1"),
     pytest.mark.skipif(
-        not TesseractOCR(settings.TESSERACT_CMD, settings.OCR_LANG, settings.OCR_PSM).status().get("ready"),
+        not get_ocr_engine().status().get("ready"),
         reason="Tesseract tidak terpasang",
     ),
 ]

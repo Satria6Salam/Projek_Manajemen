@@ -32,7 +32,7 @@ def _payload_from_scan(scan, overrides=None):
 
 def test_categories_synced(client):
     cats = _categories(client)
-    assert set(cats) == {"Makanan", "Minuman", "Kebutuhan_Rumah_Tangga", "Perawatan_Diri", "Kesehatan", "Lainnya"}
+    assert set(cats) == {"Makanan", "Minuman", "Kebutuhan_Rumah_Tangga", "Perawatan_Diri", "Kesehatan", "Elektronik", "Lainnya"}
     assert cats["Kebutuhan_Rumah_Tangga"]["name"] == "Kebutuhan Rumah Tangga"
     assert cats["Makanan"]["icon"]
 

@@ -81,3 +81,18 @@ def test_user_corrections_are_learned_per_user(client, auth, other_auth, image_b
     other = _scan(client, other_auth, image_bytes)
     assert other["merchant_name"] == "INDOMARET"
     assert "BARANG ANEH XYZ" in [i["item_name"] for i in other["items"]]
+
+
+def test_store_memory_fixes_garbled_names_from_past_purchases(client, auth, image_bytes, monkeypatch):
+    # Struk pertama terbaca benar dan disimpan.
+    first = _scan(client, auth, image_bytes)
+    _save(client, auth, first)
+    # Struk kedua dari toko yang sama, nama toko & barang rusak dibaca OCR.
+    garbled = SAMPLE_TEXT.replace("INDOMARET", "INDOMAR3T").replace("ROTI TAWAR 500G", "R0TI TAWR 500G")
+    monkeypatch.setattr(FakeOCR, "text", garbled)
+    scan = _scan(client, auth, image_bytes)
+    assert scan["merchant_name"] == first["merchant_name"]
+    names = [i["item_name"] for i in scan["items"]]
+    assert "ROTI TAWAR 500G" in names
+    roti = next(i for i in scan["items"] if i["item_name"] == "ROTI TAWAR 500G")
+    assert roti["name_corrected"] is True

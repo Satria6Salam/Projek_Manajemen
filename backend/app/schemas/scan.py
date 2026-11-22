@@ -33,6 +33,9 @@ class ScanItemOut(PredictionOut):
     suspicious: bool = Field(
         default=False, description="Tampak janggal (harga tidak lazim / sisa angka di nama) -> minta dicek"
     )
+    uncertain_words: list[str] = Field(
+        default_factory=list, description="Kata pada nama yang diragukan OCR -> disorot untuk dicek pengguna"
+    )
 
 
 class ScanOut(BaseModel):
