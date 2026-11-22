@@ -1,0 +1,270 @@
+{
+  "freshmart.jpg": {
+    "merchant": "FreshMart",
+    "date": "2026-10-01",
+    "total": 175500,
+    "items": [
+      {
+        "name": "Beras 5kg",
+        "qty": 1,
+        "price": 62000
+      },
+      {
+        "name": "Minyak Goreng 1L",
+        "qty": 1,
+        "price": 18500
+      },
+      {
+        "name": "Telur Ayam 1kg",
+        "qty": 1,
+        "price": 27000
+      },
+      {
+        "name": "Gula Pasir 1kg",
+        "qty": 1,
+        "price": 16000
+      },
+      {
+        "name": "Mie Instan (isi 5)",
+        "qty": 1,
+        "price": 12500
+      },
+      {
+        "name": "Susu UHT 1L",
+        "qty": 2,
+        "price": 30000
+      },
+      {
+        "name": "Roti Tawar",
+        "qty": 1,
+        "price": 9500
+      }
+    ]
+  },
+  "indomaret.jpg": {
+    "merchant": "Indomaret",
+    "date": "2025-10-05",
+    "total": 167100,
+    "items": [
+      {
+        "name": "Beras 5kg",
+        "qty": 1,
+        "price": 62500
+      },
+      {
+        "name": "Minyak Goreng 1L",
+        "qty": 1,
+        "price": 15800
+      },
+      {
+        "name": "Telur Ayam 1kg",
+        "qty": 1,
+        "price": 28900
+      },
+      {
+        "name": "Mie Instan",
+        "qty": 5,
+        "price": 14000
+      },
+      {
+        "name": "Susu UHT 1L",
+        "qty": 2,
+        "price": 33400
+      },
+      {
+        "name": "Roti Tawar",
+        "qty": 1,
+        "price": 12500
+      }
+    ]
+  },
+  "sejahtera_malang.jpg": {
+    "merchant": "Toko Sejahtera",
+    "date": "2026-10-12",
+    "total": 133000,
+    "items": [
+      {
+        "name": "Beras 5kg",
+        "qty": 1,
+        "price": 62000
+      },
+      {
+        "name": "Minyak Goreng 1L",
+        "qty": 1,
+        "price": 16500
+      },
+      {
+        "name": "Telur Ayam 1kg",
+        "qty": 1,
+        "price": 28000
+      },
+      {
+        "name": "Gula Pasir 1kg",
+        "qty": 1,
+        "price": 14000
+      },
+      {
+        "name": "Mie Instan",
+        "qty": 5,
+        "price": 12500
+      }
+    ]
+  },
+  "sejahtera_jakarta.jpg": {
+    "merchant": "Toko Sejahtera",
+    "date": "2025-10-02",
+    "total": 163725,
+    "items": [
+      {
+        "name": "Beras 5 kg",
+        "qty": 1,
+        "price": 62000
+      },
+      {
+        "name": "Minyak Goreng 1 L",
+        "qty": 2,
+        "price": 31000
+      },
+      {
+        "name": "Telur Ayam 1 kg",
+        "qty": 1,
+        "price": 28000
+      },
+      {
+        "name": "Gula Pasir 1 kg",
+        "qty": 1,
+        "price": 14000
+      },
+      {
+        "name": "Tepung Terigu 1 kg",
+        "qty": 1,
+        "price": 12500
+      }
+    ]
+  },
+  "indomart_raya.jpg": {
+    "merchant": "Indomart",
+    "date": "2026-11-01",
+    "total": 36000,
+    "items": [
+      {
+        "name": "Aqua 600ml",
+        "qty": 1,
+        "price": 3000
+      },
+      {
+        "name": "Indomie Goreng",
+        "qty": 2,
+        "price": 5000
+      },
+      {
+        "name": "Telur Ayam",
+        "qty": 1,
+        "price": 28000
+      }
+    ]
+  },
+  "indomaret_gondanglegi.jpg": {
+    "merchant": "Indomaret",
+    "date": "2026-11-01",
+    "total": 25600,
+    "items": [
+      {
+        "name": "Aqua 600ml",
+        "qty": 1,
+        "price": 3000
+      },
+      {
+        "name": "Indomie Goreng",
+        "qty": 2,
+        "price": 3600
+      },
+      {
+        "name": "Roti Tawar Sari Roti",
+        "qty": 1,
+        "price": 14000
+      },
+      {
+        "name": "Teh Botol Sosro 450ml",
+        "qty": 1,
+        "price": 5000
+      }
+    ]
+  },
+  "indomaret_sulfat.jpg": {
+    "merchant": "Indomaret",
+    "date": "2026-11-01",
+    "total": 25000,
+    "items": [
+      {
+        "name": "Air Mineral 600ml",
+        "qty": 1,
+        "price": 3000
+      },
+      {
+        "name": "Roti Cokelat",
+        "qty": 1,
+        "price": 6500
+      },
+      {
+        "name": "Susu UHT Cokelat 250ml",
+        "qty": 1,
+        "price": 7500
+      },
+      {
+        "name": "Biskuit Roma",
+        "qty": 1,
+        "price": 8000
+      }
+    ]
+  },
+  "indomaret_urek.jpg": {
+    "merchant": "Indomaret",
+    "date": "2026-11-05",
+    "total": 12000,
+    "items": [
+      {
+        "name": "Indomie Goreng",
+        "qty": 2,
+        "price": 6000
+      },
+      {
+        "name": "Air Mineral 600ml",
+        "qty": 1,
+        "price": 2500
+      },
+      {
+        "name": "Teh Botol Sosro",
+        "qty": 1,
+        "price": 3500
+      }
+    ]
+  },
+  "indomaret_cengger.jpg": {
+    "merchant": "Indomaret",
+    "date": "2026-11-01",
+    "total": 19000,
+    "items": [
+      {
+        "name": "Air Mineral 600ml",
+        "qty": 1,
+        "price": 3000
+      },
+      {
+        "name": "Indomie Goreng",
+        "qty": 1,
+        "price": 3500
+      },
+      {
+        "name": "Teh Botol Sosro 350ml",
+        "qty": 1,
+        "price": 5000
+      },
+      {
+        "name": "Roti Tawar",
+        "qty": 1,
+        "price": 7500
+      }
+    ]
+  }
+}

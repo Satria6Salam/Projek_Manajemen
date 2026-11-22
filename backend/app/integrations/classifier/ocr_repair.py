@@ -136,6 +136,33 @@ class OcrTextRepairer:
                         best = (score, cand)
         return best[1] if best else None
 
+    def repair_display(self, name: str) -> str:
+        """Perbaiki nama barang untuk DITAMPILKAN, tanpa mengubah huruf besar/kecil dan ukuran.
+
+        Sengaja hati-hati: hanya memulihkan satu huruf yang hilang bila hasilnya membentuk
+        pasangan kata yang dikenal ("ula Pasir" -> "Gula Pasir"). Ejaan lain tidak disentuh.
+        """
+        tokens = name.split(" ")
+        lowered = [t.lower() for t in tokens]
+        out: list[str] = []
+        for i, tok in enumerate(tokens):
+            low = lowered[i]
+            if not low.isalpha() or len(low) < 2 or self.known(low):
+                out.append(tok)
+                continue
+            prev = lowered[i - 1] if i > 0 and lowered[i - 1].isalpha() else None
+            nxt = lowered[i + 1] if i + 1 < len(lowered) and lowered[i + 1].isalpha() else None
+            fix = self._restore_with_neighbor(low, prev, nxt)
+            if not fix:
+                out.append(tok)
+            elif tok.isupper():
+                out.append(fix.upper())
+            elif tok[:1].isupper() or (i + 1 < len(tokens) and tokens[i + 1][:1].isupper()):
+                out.append(fix.capitalize())
+            else:
+                out.append(fix)
+        return " ".join(out)
+
     def _split(self, token: str) -> list[str] | None:
         if len(token) < 7:
             return None

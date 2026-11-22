@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, Response, UploadFile
+from fastapi import APIRouter, File, Form, Response, UploadFile
 from sqlalchemy import select
 
 from app.api.deps import DB, OCR, Classifier, CurrentUser, Parser, Storage
@@ -20,6 +20,10 @@ def scan_receipt(
     classifier: Classifier,
     storage: Storage,
     file: UploadFile = File(..., description="Foto struk (JPG/PNG/WEBP)"),
+    device_text: str | None = Form(
+        default=None, max_length=20_000,
+        description="Teks OCR dari HP (Google ML Kit), opsional; ikut dibandingkan dengan Tesseract",
+    ),
 ):
     """Pindai foto struk: OCR → parsing → prediksi kategori per barang.
 
@@ -27,7 +31,7 @@ def scan_receipt(
     lalu kirim ke `POST /receipts` beserta `scan_id`.
     """
     content = file.file.read()
-    return scan_service.scan_receipt(db, user, content, ocr, parser, classifier, storage)
+    return scan_service.scan_receipt(db, user, content, ocr, parser, classifier, storage, device_text)
 
 
 @router.get(

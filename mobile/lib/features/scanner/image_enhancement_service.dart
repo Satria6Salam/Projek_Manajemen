@@ -64,6 +64,18 @@ class ImageEnhancementService {
     }
   }
 
+  /// Ukur mutu foto saja (buram/gelap/pudar) tanpa menulis file, untuk
+  /// memutuskan apakah pengguna sebaiknya memotret ulang. null = gagal diukur.
+  Future<ImageQuality?> assess(String imagePath) async {
+    try {
+      final Uint8List bytes = await File(imagePath).readAsBytes();
+      return await compute(_assessBytes, bytes);
+    } catch (e) {
+      debugPrint('[STRUKKU] pengukuran mutu foto gagal: $e');
+      return null;
+    }
+  }
+
   /// Menghapus file sementara hasil perbaikan.
   Future<void> discard(EnhancedImage image) async {
     try {
@@ -73,6 +85,35 @@ class ImageEnhancementService {
       // File sementara; kegagalan menghapus tidak perlu ditampilkan.
     }
   }
+}
+
+/// Mutu foto diukur pada ukuran tetap (sisi terpanjang 1400 px), sama dengan
+/// ukuran minimum saat foto diperjelas, agar ambang buram tetap sebanding.
+ImageQuality? _assessBytes(Uint8List bytes) {
+  final img.Image? decoded = img.decodeImage(bytes);
+  if (decoded == null) return null;
+  img.Image image = img.bakeOrientation(decoded);
+  final bool landscape = image.width >= image.height;
+  image = landscape
+      ? img.copyResize(image,
+          width: ImageEnhancementService.minSide,
+          interpolation: img.Interpolation.average)
+      : img.copyResize(image,
+          height: ImageEnhancementService.minSide,
+          interpolation: img.Interpolation.average);
+  final int width = image.width;
+  final int height = image.height;
+  final Uint8List gray = Uint8List(width * height);
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      final img.Pixel pixel = image.getPixel(x, y);
+      final double luminance =
+          0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+      gray[y * width + x] =
+          luminance <= 0 ? 0 : (luminance >= 255 ? 255 : luminance.round());
+    }
+  }
+  return const ImageEnhancer().enhance(gray, width, height).quality;
 }
 
 _EnhanceOutput? _enhanceBytes(_EnhanceInput input) {

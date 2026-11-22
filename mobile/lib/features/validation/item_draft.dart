@@ -14,6 +14,9 @@ class ItemDraft {
     this.unitPrice,
     this.predictedCategoryId,
     this.predictionSource,
+    this.priceCorrected = false,
+    this.nameCorrected = false,
+    this.suspicious = false,
   })  : originalCategoryId = categoryId,
         nameCtl = TextEditingController(text: name),
         priceCtl =
@@ -42,6 +45,18 @@ class ItemDraft {
   /// Kategori & sumber prediksi server, dikirim balik saat menyimpan.
   int? predictedCategoryId;
   String? predictionSource;
+
+  /// Harga diubah otomatis karena diduga salah baca OCR (dari server).
+  final bool priceCorrected;
+
+  /// Nama diperbaiki otomatis (huruf hilang / koreksi pengguna sebelumnya).
+  final bool nameCorrected;
+
+  /// Tampak janggal menurut server (harga tidak lazim / sisa angka di nama).
+  final bool suspicious;
+
+  /// Ada angka/nama yang diubah otomatis atau janggal -> tanda "cek struk".
+  bool get autoCorrected => priceCorrected || nameCorrected || suspicious;
 
   /// Nama terakhir yang sudah ditebak kategorinya (hindari tebakan berulang).
   String? guessedFor;

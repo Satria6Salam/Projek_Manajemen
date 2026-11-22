@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_config.dart';
@@ -19,6 +21,7 @@ import 'image_enhancement_service.dart';
 import 'ocr_service.dart';
 import 'receipt_selector.dart';
 import 'scan_result.dart';
+import 'steadiness_tracker.dart';
 
 /// Halaman Pindai Struk: kamera + bingkai, galeri, OCR, lalu ke validasi.
 class ScannerScreen extends StatefulWidget {
@@ -44,6 +47,16 @@ class _ScannerScreenState extends State<ScannerScreen>
 
   XFile? _captured;
   bool _processing = false;
+
+  // Kestabilan HP: foto goyang berat tidak bisa diperbaiki, jadi dicegah sejak memotret.
+  final SteadinessTracker _steady = SteadinessTracker();
+  StreamSubscription<UserAccelerometerEvent>? _motionSub;
+  bool _motionAvailable = false;
+  bool _wasSteady = false;
+  bool _autoCapture = false;
+  bool _autoFired = false;
+  DateTime _lastMotionUi = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _autoCaptureAfter = Duration(milliseconds: 1200);
   String _processingLabel = '';
 
   // Pindai banyak struk dari galeri: diproses satu per satu.
@@ -60,13 +73,85 @@ class _ScannerScreenState extends State<ScannerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initCamera();
+    _startMotion();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _motionSub?.cancel();
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _startMotion() {
+    try {
+      _motionSub = userAccelerometerEventStream(
+              samplingPeriod: SensorInterval.uiInterval)
+          .listen(_onMotion, onError: (_) {
+        if (mounted) setState(() => _motionAvailable = false);
+      }, cancelOnError: true);
+    } catch (_) {
+      _motionAvailable = false; // sensor tidak ada: kamera tetap jalan normal
+    }
+  }
+
+  void _onMotion(UserAccelerometerEvent e) {
+    final now = DateTime.now();
+    _steady.add(e.x, e.y, e.z, now);
+    if (!mounted) return;
+    final steady = _steady.isSteady;
+    final cameraLive = _controller != null && _captured == null && !_processing;
+    if (_autoCapture &&
+        !_autoFired &&
+        cameraLive &&
+        _steady.steadyFor(now) >= _autoCaptureAfter) {
+      _autoFired = true;
+      _capture();
+    }
+    // Perbarui indikator saat status berubah, atau paling sering 4x per detik.
+    if (!_motionAvailable ||
+        steady != _wasSteady ||
+        now.difference(_lastMotionUi) > const Duration(milliseconds: 250)) {
+      _lastMotionUi = now;
+      setState(() {
+        _motionAvailable = true;
+        _wasSteady = steady;
+      });
+    }
+  }
+
+  /// Setelah memotret: bila foto sangat buram/goyang atau terlalu gelap,
+  /// sarankan foto ulang (lebih baik daripada hasil baca yang salah).
+  Future<void> _checkCaptureQuality(XFile file) async {
+    final quality = await _enhancer.assess(file.path);
+    if (quality == null || !mounted || _captured?.path != file.path) return;
+    final verdict = CaptureVerdict.judge(
+      blurLevel: quality.blurLevel,
+      isDark: quality.isDark,
+      brightness: quality.brightness,
+    );
+    if (!verdict.retake) return;
+    final retake = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Foto kurang jelas'),
+        content: Text(
+          'Terdeteksi: ${verdict.reasons.join(', ')}. Hasil baca struk bisa salah.\n\n'
+          'Tips: tahan HP diam sampai indikator hijau, pastikan cahaya cukup '
+          '(nyalakan flash bila perlu), dan seluruh struk masuk bingkai.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Tetap pakai')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Foto ulang')),
+        ],
+      ),
+    );
+    if (retake == true && mounted) _retake();
   }
 
   @override
@@ -163,7 +248,10 @@ class _ScannerScreenState extends State<ScannerScreen>
         await c.setFlashMode(FlashMode.off);
         _torchOn = false;
       }
-      if (mounted) setState(() => _captured = file);
+      if (mounted) {
+        setState(() => _captured = file);
+        unawaited(_checkCaptureQuality(file));
+      }
     } on CameraException catch (e) {
       if (mounted) {
         showAppSnackBar(
@@ -180,6 +268,7 @@ class _ScannerScreenState extends State<ScannerScreen>
       if (files.isEmpty || !mounted) return;
       if (files.length == 1) {
         setState(() => _captured = files.first);
+        unawaited(_checkCaptureQuality(files.first));
         return;
       }
       setState(() {
@@ -197,6 +286,8 @@ class _ScannerScreenState extends State<ScannerScreen>
   }
 
   void _retake() {
+    _autoFired = false;
+    _steady.reset();
     setState(() => _captured = null);
     if (_controller == null) _initCamera();
   }
@@ -218,9 +309,21 @@ class _ScannerScreenState extends State<ScannerScreen>
     });
 
     // 1. Mode server: OCR Tesseract bertingkat + parser lengkap (qty, harga
-    //    satuan) + kategori, dan foto tersimpan di server. Bila server tidak
-    //    terjangkau atau tidak bisa membaca struk, lanjut ke OCR di HP.
-    final ServerScan? server = await _tryServerScan(path);
+    //    satuan) + kategori, dan foto tersimpan di server. Teks ML Kit dari HP
+    //    ikut dikirim agar server memilih bacaan yang paling konsisten dari
+    //    dua mesin OCR. Bila server tidak terjangkau atau tidak bisa membaca
+    //    struk, lanjut ke OCR di HP.
+    String? deviceText;
+    if (AppConfig.useFastApi) {
+      try {
+        deviceText =
+            await _ocr.recognize(path).timeout(const Duration(seconds: 8));
+      } catch (_) {
+        deviceText = null; // ML Kit gagal: server tetap memakai Tesseract.
+      }
+      if (!mounted) return;
+    }
+    final ServerScan? server = await _tryServerScan(path, deviceText);
     if (!mounted) return;
     if (server != null) {
       await _goToValidation(
@@ -230,6 +333,8 @@ class _ScannerScreenState extends State<ScannerScreen>
         classification: server.classification,
         scanId: server.scanId,
         warnings: server.warnings,
+        consistent: server.consistent,
+        reviewFields: server.reviewFields,
       );
       return;
     }
@@ -300,10 +405,10 @@ class _ScannerScreenState extends State<ScannerScreen>
 
   /// Pindai di server. null = tidak dipakai (mode demo), gagal, atau tidak
   /// terbaca, sehingga pemanggil memakai OCR di HP.
-  Future<ServerScan?> _tryServerScan(String path) async {
+  Future<ServerScan?> _tryServerScan(String path, String? deviceText) async {
     try {
-      final ServerScan? scan =
-          await AppRepositories.instance.receipts.scanReceipt(path);
+      final ServerScan? scan = await AppRepositories.instance.receipts
+          .scanReceipt(path, deviceText: deviceText);
       if (scan == null || scan.parsed.isEmpty) return null;
       return scan;
     } on AppException catch (e) {
@@ -330,6 +435,8 @@ class _ScannerScreenState extends State<ScannerScreen>
     ClassificationResult? classification,
     String? scanId,
     List<String> warnings = const <String>[],
+    bool? consistent,
+    List<String> reviewFields = const <String>[],
   }) async {
     setState(() {
       _processing = true;
@@ -380,6 +487,8 @@ class _ScannerScreenState extends State<ScannerScreen>
             enhanced: enhanced,
             scanId: scanId,
             warnings: warnings,
+            consistent: consistent,
+            reviewFields: reviewFields,
           ),
         ),
       );
@@ -509,13 +618,17 @@ class _ScannerScreenState extends State<ScannerScreen>
                   Expanded(child: _buildFrameArea()),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Text(
-                      _captured != null
-                          ? 'Struk berhasil dipindai'
-                          : 'Posisikan seluruh struk di dalam bingkai',
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 12.5),
-                    ),
+                    child: _captured == null &&
+                            _motionAvailable &&
+                            _controller != null
+                        ? _buildSteadyHint()
+                        : Text(
+                            _captured != null
+                                ? 'Struk berhasil dipindai'
+                                : 'Posisikan seluruh struk di dalam bingkai',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12.5),
+                          ),
                   ),
                   _buildBottomBar(),
                   const SizedBox(height: 18),
@@ -543,6 +656,41 @@ class _ScannerScreenState extends State<ScannerScreen>
           ),
         ),
       ),
+    );
+  }
+
+  void _toggleAutoCapture() {
+    setState(() {
+      _autoCapture = !_autoCapture;
+      _autoFired = false;
+      _steady.reset();
+    });
+    showAppSnackBar(
+        context,
+        _autoCapture
+            ? 'Foto otomatis aktif: tahan HP diam sampai indikator hijau.'
+            : 'Foto otomatis dimatikan.');
+  }
+
+  /// Indikator kestabilan: hijau = siap foto, kuning = tahan HP diam.
+  Widget _buildSteadyHint() {
+    final steady = _steady.isSteady;
+    final color = steady ? AppColors.scanGreen : const Color(0xFFFFB74D);
+    final text = steady
+        ? (_autoCapture
+            ? 'HP diam \u2014 memotret otomatis...'
+            : 'HP diam \u2014 siap memotret')
+        : 'Tahan HP diam agar foto tidak buram';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(steady ? Icons.check_circle : Icons.pan_tool_alt_outlined,
+            color: color, size: 16),
+        const SizedBox(width: 6),
+        Text(text,
+            style: TextStyle(
+                color: color, fontSize: 12.5, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 
@@ -578,13 +726,30 @@ class _ScannerScreenState extends State<ScannerScreen>
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w700)),
-          _circleButton(
-            _torchOn ? Icons.flash_on : Icons.flash_off,
-            (_controller != null && _captured == null && !_processing)
-                ? _toggleTorch
-                : null,
-            tooltip: 'Flash',
-            color: _torchOn ? const Color(0xFFFFD54F) : Colors.white,
+          Row(
+            children: [
+              if (_motionAvailable) ...[
+                _circleButton(
+                  _autoCapture
+                      ? Icons.motion_photos_auto
+                      : Icons.motion_photos_off,
+                  (_captured == null && !_processing)
+                      ? _toggleAutoCapture
+                      : null,
+                  tooltip: 'Foto otomatis saat HP diam',
+                  color: _autoCapture ? AppColors.scanGreen : Colors.white,
+                ),
+                const SizedBox(width: 10),
+              ],
+              _circleButton(
+                _torchOn ? Icons.flash_on : Icons.flash_off,
+                (_controller != null && _captured == null && !_processing)
+                    ? _toggleTorch
+                    : null,
+                tooltip: 'Flash',
+                color: _torchOn ? const Color(0xFFFFD54F) : Colors.white,
+              ),
+            ],
           ),
         ],
       ),

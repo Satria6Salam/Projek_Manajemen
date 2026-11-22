@@ -20,7 +20,8 @@ from app.integrations.parser.base import ReceiptParser
 from app.integrations.storage.base import StorageBackend
 from app.models import ScanAsset, User
 from app.schemas.scan import ScanItemOut, ScanOut
-from app.services import prediction_service
+from app.services import ocr_learning_service, prediction_service
+from app.services.receipt_reader import read_receipt
 
 logger = logging.getLogger("strukku")
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO", "BMP"}
@@ -60,12 +61,14 @@ def scan_receipt(
     parser: ReceiptParser,
     classifier: ClassifierChain,
     storage: StorageBackend,
+    device_text: str | None = None,
 ) -> ScanOut:
+    """`device_text` = teks hasil Google ML Kit di HP (opsional), ikut dibandingkan."""
     image = load_image(content)
 
     try:
-        ocr_result = ocr.extract(image)
-        raw_text = ocr_result.text
+        reading = read_receipt(image, ocr, parser, device_text=device_text)
+        ocr_result, raw_text, parsed = reading.ocr, reading.raw_text, reading.parsed
     except Exception as exc:
         logger.exception("OCR gagal")
         raise ServiceUnavailableError(
@@ -86,13 +89,19 @@ def scan_receipt(
             f"Detail: {exc.__class__.__name__}",
             code="STORAGE_FAILED",
         )
+    # Koreksi yang pernah dibuat pengguna (nama toko / nama barang per toko) diterapkan.
+    learned = 0
+    try:
+        learned = ocr_learning_service.apply_corrections(db, user.id, parsed)
+    except Exception:  # pragma: no cover - kamus koreksi tidak boleh menggagalkan scan
+        logger.exception("Gagal menerapkan kamus koreksi OCR")
     db.add(ScanAsset(
         owner_id=user.id,
         storage_key=scan_id,
         expires_at=utcnow() + timedelta(hours=settings.SCAN_ASSET_EXPIRE_HOURS),
+        ocr_snapshot=ocr_learning_service.snapshot(parsed, raw_text),
     ))
     db.commit()
-    parsed = parser.parse(raw_text)
     predictions = prediction_service.classify(db, user.id, [i.name for i in parsed.items], classifier)
 
     items = [
@@ -103,6 +112,9 @@ def scan_receipt(
             unit_price=item.unit_price,
             item_price=item.price,
             predicted_category_id=prediction.category_id,
+            price_corrected=item.price_corrected,
+            name_corrected=item.name_corrected,
+            suspicious=item.suspicious,
             **prediction.model_dump(),
         )
         for index, (item, prediction) in enumerate(zip(parsed.items, predictions))
@@ -110,7 +122,10 @@ def scan_receipt(
     items_total = round(sum(i.item_price or 0 for i in items), 2)
     total_matches = None
     if parsed.total_amount is not None and items:
-        total_matches = abs(parsed.total_amount - items_total) < 1
+        targets = [parsed.total_amount, parsed.total_amount + parsed.discount_amount]
+        if parsed.subtotal_amount is not None:
+            targets.append(parsed.subtotal_amount)
+        total_matches = any(abs(t - items_total) < 1 for t in targets)
 
     warnings: list[str] = []
     if ocr_result.quality_notes:
@@ -119,6 +134,13 @@ def scan_receipt(
             warnings.append(f"Kualitas foto kurang baik ({notes}); foto sudah diperjelas otomatis. Periksa hasilnya.")
         else:
             warnings.append(f"Kualitas foto kurang baik ({notes}). Periksa hasilnya atau foto ulang.")
+    if parsed.corrections:
+        warnings.append(
+            "Beberapa angka dikoreksi otomatis karena kemungkinan salah baca OCR "
+            f"({'; '.join(parsed.corrections[:3])}). Periksa kembali."
+        )
+    if learned:
+        warnings.append(f"{learned} nama diisi dari koreksi Anda sebelumnya.")
     if not items:
         warnings.append("Tidak ada barang terdeteksi. Tambahkan barang secara manual atau foto ulang struk.")
     if parsed.total_amount is None:
@@ -145,4 +167,8 @@ def scan_receipt(
         items=items,
         warnings=warnings,
         raw_text=raw_text,
+        consistent=reading.consistent,
+        field_confidence=reading.confidence,
+        review_fields=reading.review_fields,
+        ocr_source=reading.label or "tesseract",
     )

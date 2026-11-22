@@ -11,6 +11,17 @@ class OcrResult:
     quality_notes: list[str] = field(default_factory=list)
     # True bila teks berasal dari foto yang sudah diperjelas otomatis.
     enhanced: bool = False
+    # Semua bacaan alternatif (praproses/mode berbeda). Layanan scan memilih yang
+    # hasil parsing-nya paling masuk akal; `text` adalah pilihan terbaik versi OCR.
+    candidates: list["OcrCandidate"] = field(default_factory=list)
+
+
+@dataclass
+class OcrCandidate:
+    text: str
+    ocr_score: float
+    enhanced: bool
+    label: str = ""
 
 
 class OCREngine(ABC):

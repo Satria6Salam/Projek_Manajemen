@@ -90,7 +90,23 @@ class ServerScan {
     required this.parsed,
     required this.classification,
     this.warnings = const [],
+    this.consistent,
+    this.fieldConfidence = const {},
+    this.reviewFields = const [],
+    this.ocrSource,
   });
+
+  /// true = jumlah harga barang sama dengan subtotal/total struk.
+  final bool? consistent;
+
+  /// Keyakinan per kolom: merchant/date/total/items -> tinggi|sedang|rendah.
+  final Map<String, String> fieldConfidence;
+
+  /// Kolom yang perlu dicek pengguna (mis. ["total", "items"]).
+  final List<String> reviewFields;
+
+  /// Sumber bacaan terpilih di server (tesseract / ML Kit (HP) / ...).
+  final String? ocrSource;
 
   /// Kirim kembali saat menyimpan agar foto ikut tersimpan di server.
   final String scanId;
@@ -122,7 +138,9 @@ abstract class ReceiptRepository {
 
   /// Pindai foto struk di server. Mengembalikan null bila mode ini tidak
   /// mendukung pindai server (mode demo) sehingga OCR di HP yang dipakai.
-  Future<ServerScan?> scanReceipt(String imagePath);
+  /// [deviceText] = teks hasil ML Kit di HP, dikirim agar server bisa
+  /// membandingkannya dengan bacaan Tesseract dan memilih yang paling konsisten.
+  Future<ServerScan?> scanReceipt(String imagePath, {String? deviceText});
 
   /// Menyimpan struk beserta item (termasuk koreksi kategori pengguna).
   ///

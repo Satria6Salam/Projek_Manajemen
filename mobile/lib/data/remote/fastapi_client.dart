@@ -101,10 +101,11 @@ class FastApiClient {
 
   /// Unggah satu file (multipart/form-data, field [field]).
   Future<dynamic> upload(String path, String filePath,
-      {String field = 'file', Duration? timeout}) {
+      {String field = 'file', Duration? timeout, Map<String, String>? fields}) {
     return _send(() async {
       final req = http.MultipartRequest('POST', _uri(path))
         ..headers.addAll({'Accept': 'application/json', ...authHeaders})
+        ..fields.addAll(fields ?? const {})
         ..files.add(await http.MultipartFile.fromPath(field, filePath));
       return http.Response.fromStream(await _client.send(req));
     }, timeout: timeout ?? ApiConfig.longTimeout);

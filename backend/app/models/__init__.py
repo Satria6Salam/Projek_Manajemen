@@ -6,5 +6,6 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.security_event import SecurityEvent
 from app.models.refresh_token import RefreshToken
 from app.models.scan_asset import ScanAsset
+from app.models.ocr_learning import OcrCorrection, ScanFeedback
 
-__all__ = ["User", "PasswordResetToken", "SecurityEvent", "RefreshToken", "ScanAsset", "Category", "Receipt", "ReceiptItem"]
+__all__ = ["User", "PasswordResetToken", "SecurityEvent", "RefreshToken", "ScanAsset", "OcrCorrection", "ScanFeedback", "Category", "Receipt", "ReceiptItem"]

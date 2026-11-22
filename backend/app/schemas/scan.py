@@ -24,6 +24,15 @@ class ScanItemOut(PredictionOut):
     predicted_category_id: int | None = Field(
         default=None, description="Kirim balik saat menyimpan agar koreksi pengguna tercatat"
     )
+    price_corrected: bool = Field(
+        default=False, description="Harga diubah otomatis karena diduga salah baca OCR -> tandai untuk dicek"
+    )
+    name_corrected: bool = Field(
+        default=False, description="Nama diperbaiki otomatis (huruf hilang / koreksi pengguna sebelumnya)"
+    )
+    suspicious: bool = Field(
+        default=False, description="Tampak janggal (harga tidak lazim / sisa angka di nama) -> minta dicek"
+    )
 
 
 class ScanOut(BaseModel):
@@ -41,6 +50,14 @@ class ScanOut(BaseModel):
     items: list[ScanItemOut]
     warnings: list[str]
     raw_text: str
+    consistent: bool = Field(
+        default=False, description="Jumlah harga barang = subtotal/total struk (angka hampir pasti benar)"
+    )
+    field_confidence: dict[str, str] = Field(
+        default_factory=dict, description="Keyakinan per kolom: merchant/date/total/items -> tinggi|sedang|rendah"
+    )
+    review_fields: list[str] = Field(default_factory=list, description="Kolom yang perlu dicek pengguna")
+    ocr_source: str = Field(default="tesseract", description="Sumber bacaan terpilih (tesseract / ML Kit (HP) / ...)")
 
 
 class ClassifyRequest(BaseModel):

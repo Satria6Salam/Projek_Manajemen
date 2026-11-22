@@ -217,7 +217,9 @@ class _FakeReceipts implements ReceiptRepository {
   @override
   Future<ReceiptModel> saveReceipt(ReceiptModel receipt, {bool allowDuplicate = false}) async => receipt;
   @override
-  Future<ServerScan?> scanReceipt(String imagePath) async => null;
+  Future<ServerScan?> scanReceipt(String imagePath,
+          {String? deviceText}) async =>
+      null;
 }
 
 Future<void> _loadFonts() async {

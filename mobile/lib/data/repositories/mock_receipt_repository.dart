@@ -237,7 +237,9 @@ class MockReceiptRepository implements ReceiptRepository {
   }
 
   @override
-  Future<ServerScan?> scanReceipt(String imagePath) async => null;
+  Future<ServerScan?> scanReceipt(String imagePath,
+          {String? deviceText}) async =>
+      null;
 
   @override
   Future<ModelReport?> getModelReport() async => null;

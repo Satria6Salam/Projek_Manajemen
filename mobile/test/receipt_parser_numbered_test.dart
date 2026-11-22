@@ -27,6 +27,9 @@ Total 437.000''';
   test('qty di depan nama tidak dianggap nomor urut', () {
     final parsed =
         ReceiptParser.parse('WARUNG BU SRI\n2 INDOMIE GORENG 7.000\n4 TELUR AYAM 10.000\nTOTAL 17.000');
-    expect(parsed.items.map((i) => i.name).toList(), ['2 INDOMIE GORENG', '4 TELUR AYAM']);
+    // Bukan nomor urut -> qty di depan nama (format warung/kafe).
+    expect(parsed.items.map((i) => i.name).toList(), ['INDOMIE GORENG', 'TELUR AYAM']);
+    expect(parsed.items.map((i) => i.quantity).toList(), [2, 4]);
+    expect(parsed.items.map((i) => i.unitPrice).toList(), [3500, 2500]);
   });
 }

@@ -114,6 +114,9 @@ class _ValidationScreenState extends State<ValidationScreen> {
           unitPrice: parsedItem.unitPrice,
           predictedCategoryId: pred?.categoryId ?? categoryId,
           predictionSource: pred?.source,
+          priceCorrected: parsedItem.priceCorrected,
+          nameCorrected: parsedItem.nameCorrected,
+          suspicious: parsedItem.suspicious,
         ));
       }
 
@@ -423,6 +426,7 @@ class _ValidationScreenState extends State<ValidationScreen> {
                   const SizedBox(height: 12),
                 ],
                 ..._buildRecommendation(),
+                ..._buildReviewBanner(),
                 if (_needsCheckCount > 0) ...[
                   StatusBanner(
                     type: BannerType.warning,
@@ -629,9 +633,51 @@ class _ValidationScreenState extends State<ValidationScreen> {
     );
   }
 
+  /// Bagian yang perlu dicek menurut server: lebih baik bertanya daripada
+  /// menyimpan angka yang salah tanpa tanda.
+  List<Widget> _buildReviewBanner() {
+    final scan = widget.scan;
+    if (!scan.scannedByServer) return const <Widget>[];
+    const labels = {
+      'merchant': 'nama toko',
+      'date': 'tanggal',
+      'total': 'total',
+      'items': 'harga barang',
+    };
+    final fields =
+        scan.reviewFields.map((f) => labels[f]).whereType<String>().toList();
+    final corrected = _items.where((i) => i.autoCorrected).length;
+    if (scan.consistent == true && fields.isEmpty && corrected == 0) {
+      return const <Widget>[
+        StatusBanner(
+          type: BannerType.info,
+          title: 'Angka struk konsisten',
+          message: 'Jumlah harga barang sama dengan total struk.',
+        ),
+        SizedBox(height: 12),
+      ];
+    }
+    final parts = <String>[
+      if (scan.consistent == false)
+        'Jumlah harga barang belum sama dengan total struk.',
+      if (fields.isNotEmpty) 'Cek: ${fields.join(', ')}.',
+      if (corrected > 0)
+        '$corrected barang diubah otomatis atau tampak janggal (bertanda kuning), '
+            'cocokkan dengan struk.',
+    ];
+    return <Widget>[
+      StatusBanner(
+        type: BannerType.warning,
+        title: 'Periksa sebelum menyimpan',
+        message: parts.join('\n'),
+      ),
+      const SizedBox(height: 12),
+    ];
+  }
+
   Widget _buildItemCard(int index) {
     final item = _items[index];
-    final warn = item.needsCheck;
+    final warn = item.needsCheck || item.autoCorrected;
 
     late final String info;
     if (item.categoryId == null) {
@@ -769,9 +815,15 @@ class _ValidationScreenState extends State<ValidationScreen> {
                     ],
                     Flexible(
                       child: Text(
-                        warn && item.confidence != null
-                            ? '${Fmt.percent(item.confidence!)} \u00B7 Periksa'
-                            : info,
+                        item.autoCorrected
+                            ? (item.priceCorrected
+                                ? 'Harga dikoreksi otomatis \u00B7 cek struk'
+                                : item.nameCorrected
+                                    ? 'Nama diperbaiki otomatis \u00B7 cek struk'
+                                    : 'Tampak janggal \u00B7 cocokkan dengan struk')
+                            : warn && item.confidence != null
+                                ? '${Fmt.percent(item.confidence!)} \u00B7 Periksa'
+                                : info,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: item.isUserCorrected

@@ -14,7 +14,15 @@ class ScanResult {
     this.enhanced = false,
     this.scanId,
     this.warnings = const <String>[],
+    this.consistent,
+    this.reviewFields = const <String>[],
   });
+
+  /// true = jumlah harga barang cocok dengan total (dari server); null = tidak diketahui.
+  final bool? consistent;
+
+  /// Kolom yang perlu dicek pengguna menurut server ("merchant", "date", "total", "items").
+  final List<String> reviewFields;
 
   /// scan_id dari server (null bila dibaca di HP / mode demo).
   final String? scanId;

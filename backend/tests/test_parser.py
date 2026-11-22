@@ -85,7 +85,10 @@ def test_leading_quantity_is_not_mistaken_for_row_number():
 TOTAL 17.000
 """
     parsed = RegexReceiptParser().parse(text)
-    assert [i.name for i in parsed.items] == ["2 INDOMIE GORENG", "4 TELUR AYAM"]
+    # Bukan nomor urut (2, 4 tidak berurutan) -> qty di depan nama, format warung/kafe.
+    assert [i.name for i in parsed.items] == ["INDOMIE GORENG", "TELUR AYAM"]
+    assert [i.quantity for i in parsed.items] == [2, 4]
+    assert [i.unit_price for i in parsed.items] == [3500, 2500]
 
 
 # --- Regresi dari foto struk nyata (teks hasil OCR) ---------------------------

@@ -1,4 +1,5 @@
 """Pencatatan transaksi (struk) milik pengguna yang sedang login."""
+import logging
 import math
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -22,6 +23,8 @@ from app.schemas.receipt import (
     ReceiptSummaryOut,
     ReceiptUpdate,
 )
+
+logger = logging.getLogger("strukku")
 from app.services import category_service
 
 _ITEMS = selectinload(Receipt.items).joinedload(ReceiptItem.category)
@@ -144,6 +147,23 @@ def _learn_if_corrected(items: list[ReceiptItem]) -> None:
         learning_service.schedule_retrain()
 
 
+def _learn_from_scan(db: Session, user: User, receipt: Receipt, asset: ScanAsset, data: ReceiptCreate) -> None:
+    """Bandingkan hasil pindai dengan data yang disimpan pengguna -> kamus koreksi + data uji."""
+    from app.services import ocr_learning_service
+
+    final = {
+        "merchant": receipt.merchant_name,
+        "date": receipt.transaction_date.isoformat() if receipt.transaction_date else None,
+        "total": receipt.total_amount,
+        "items": [{"name": i.item_name, "qty": i.quantity, "price": i.item_price} for i in data.items],
+    }
+    try:
+        db.flush()
+        ocr_learning_service.learn_from_save(db, user.id, receipt.id, asset.ocr_snapshot, data.raw_text, final)
+    except Exception:  # pragma: no cover - belajar tidak boleh menggagalkan penyimpanan struk
+        logger.exception("Gagal mencatat koreksi OCR")
+
+
 def create(db: Session, user: User, data: ReceiptCreate, storage: StorageBackend) -> ReceiptOut:
     image_key = None
     if data.scan_id:
@@ -185,6 +205,7 @@ def create(db: Session, user: User, data: ReceiptCreate, storage: StorageBackend
         scan_asset = db.scalar(select(ScanAsset).where(ScanAsset.storage_key == image_key, ScanAsset.owner_id == user.id))
         if scan_asset:
             scan_asset.used_at = utcnow()
+            _learn_from_scan(db, user, receipt, scan_asset, data)
     db.commit()
     _learn_if_corrected(receipt.items)
     return to_detail(_get_owned(db, user, receipt.id))

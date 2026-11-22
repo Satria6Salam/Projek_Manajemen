@@ -145,9 +145,17 @@ class FastApiReceiptRepository implements ReceiptRepository {
   // ------------------------------------------------------------------ pindai
   /// POST /scans (multipart, field "file") -> ScanOut.
   @override
-  Future<ServerScan?> scanReceipt(String imagePath) async {
+  Future<ServerScan?> scanReceipt(String imagePath,
+      {String? deviceText}) async {
+    final text = deviceText?.trim() ?? '';
     final data = await _client.upload(ApiRoutes.scans, imagePath,
-        timeout: const Duration(seconds: 90));
+        timeout: const Duration(seconds: 90),
+        fields: text.isEmpty
+            ? null
+            : {
+                'device_text':
+                    text.length > 20000 ? text.substring(0, 20000) : text
+              });
     if (data is! Map<String, dynamic> || data['scan_id'] is! String) {
       throw AppException('Respons pindai dari server tidak sesuai format.');
     }
@@ -163,7 +171,11 @@ class FastApiReceiptRepository implements ReceiptRepository {
       final price = (m['item_price'] as num?)?.toDouble() ??
           (unit == null ? 0 : unit * qty);
       items.add(ParsedItem(name, price,
-          quantity: qty < 1 ? 1 : qty, unitPrice: unit));
+          quantity: qty < 1 ? 1 : qty,
+          unitPrice: unit,
+          priceCorrected: m['price_corrected'] == true,
+          nameCorrected: m['name_corrected'] == true,
+          suspicious: m['suspicious'] == true));
       final cat = m['category'];
       predictions.add(ItemPrediction(
         itemName: name,
@@ -192,6 +204,16 @@ class FastApiReceiptRepository implements ReceiptRepository {
           ClassificationResult(predictions: predictions, isSimulated: false),
       warnings:
           (data['warnings'] as List? ?? const []).map((w) => '$w').toList(),
+      consistent: data['consistent'] as bool?,
+      fieldConfidence: {
+        for (final e
+            in ((data['field_confidence'] as Map?) ?? const {}).entries)
+          '${e.key}': '${e.value}',
+      },
+      reviewFields: (data['review_fields'] as List? ?? const [])
+          .map((f) => '$f')
+          .toList(),
+      ocrSource: data['ocr_source'] as String?,
     );
   }
 

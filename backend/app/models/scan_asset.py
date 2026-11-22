@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.timeutils import utcnow
@@ -20,3 +20,5 @@ class ScanAsset(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    # Hasil OCR + parser saat pindai (JSON); dibandingkan dengan hasil koreksi pengguna saat disimpan.
+    ocr_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
