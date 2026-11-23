@@ -62,8 +62,11 @@ def rebuild_lines(boxes: list[tuple[float, float, float, str]]) -> str:
 class RapidOCREngine(OCREngine):
     name = "rapid"
 
-    def __init__(self, tesseract: TesseractOCR | None = None):
+    def __init__(self, tesseract: TesseractOCR | None = None, tesseract_mode: str = "on_demand"):
         self._engine = None
+        # on_demand: Tesseract tidak ikut di extract(); layanan scan memanggil
+        # tesseract_candidates() hanya bila bacaan lain belum yakin.
+        self.tesseract_mode = tesseract_mode
         self._lock = threading.Lock()
         self.tesseract = tesseract
 
@@ -97,7 +100,7 @@ class RapidOCREngine(OCREngine):
         # Hibrida: Tesseract tetap dibaca. RapidOCR unggul pada foto HP (tinta pudar, kertas
         # terlipat); Tesseract unggul pada cetakan bersih (spasi antarkata lebih rapi).
         # Layanan scan memilih bacaan yang hasil parsing-nya paling konsisten.
-        if self.tesseract is not None:
+        if self.tesseract is not None and self.tesseract_mode == "always":
             try:
                 tess = self.tesseract.extract(image)
                 candidates += tess.candidates
@@ -105,6 +108,16 @@ class RapidOCREngine(OCREngine):
             except Exception:
                 logger.exception("Tesseract (pembanding) gagal")
         return OcrResult(text, quality.notes, enhanced, candidates)
+
+    def tesseract_candidates(self, image: Image.Image) -> list[OcrCandidate]:
+        """Bacaan utama Tesseract, untuk mode on_demand (kosong bila sudah ikut / mati)."""
+        if self.tesseract is None or self.tesseract_mode != "on_demand":
+            return []
+        try:
+            return self.tesseract.extract(image).candidates
+        except Exception:
+            logger.exception("Tesseract (penengah) gagal")
+            return []
 
     def extra_candidates(self, image: Image.Image) -> list[OcrCandidate]:
         """Cadangan: bacaan Tesseract (foto asli/diperjelas, beberapa mode)."""

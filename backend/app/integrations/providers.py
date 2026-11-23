@@ -37,7 +37,8 @@ def _tesseract() -> TesseractOCR:
 def _rapid():
     from app.integrations.ocr.rapid import RapidOCREngine
 
-    return RapidOCREngine(tesseract=_tesseract())
+    mode = settings.OCR_TESSERACT.lower()
+    return RapidOCREngine(tesseract=None if mode == "off" else _tesseract(), tesseract_mode=mode)
 
 
 def _auto():

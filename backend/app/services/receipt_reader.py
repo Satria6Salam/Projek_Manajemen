@@ -63,6 +63,33 @@ def plausibility(parsed: ParsedReceipt) -> float:
     return score
 
 
+def _needs_referee(reading: ReceiptReading, parsed_all) -> bool:
+    """True bila bacaan terbaik belum konsisten, atau pembaca lain tidak sepakat soal total
+    / jumlah barang."""
+    if not is_consistent(reading.parsed):
+        return True
+    best = reading.parsed
+    # Data kepala struk belum lengkap: bacaan pembanding mungkin menemukannya.
+    if best.transaction_date is None or best.total_amount is None or not best.merchant_name:
+        return True
+    # Nama berakhir angka tunggal ("minyak goreng 1"): satuan di belakangnya mungkin hilang.
+    if any(re.search(r"\s\d{1,2}$", item.name.strip()) for item in best.items):
+        return True
+    # Nama barang yang ejaannya jelek (kata tak dikenal, spasi rusak) perlu bacaan pembanding.
+    for item in best.items:
+        if _name_readability(item.name) < 0.8 or re.search(r"[a-z]{10,}", item.name.lower()):
+            return True
+    for _, other in parsed_all:
+        if other is best or not other.items:
+            continue
+        if (other.total_amount is not None and best.total_amount is not None
+                and abs(other.total_amount - best.total_amount) >= 1):
+            return True
+        if abs(len(other.items) - len(best.items)) > 1:
+            return True
+    return False
+
+
 def _name_readability(name: str) -> float:
     """Porsi kata (>= 3 huruf) pada nama yang dikenal kosakata, 0-1."""
     from app.integrations.providers import get_normalizer
@@ -312,6 +339,14 @@ def read_receipt(
         return best[1]
 
     reading = pick(candidates)
+    # Tesseract sebagai penengah: dipanggil hanya bila bacaan RapidOCR/ML Kit belum
+    # konsisten atau saling berbeda (struk jelas tidak perlu menunggu Tesseract).
+    lazy = getattr(ocr, "tesseract_candidates", None)
+    if lazy and _needs_referee(reading, parsed_all):
+        more = lazy(image)
+        if more:
+            candidates += more
+            reading = pick(candidates)
     # Belum konsisten (mis. kolom harga di kanan tidak terbaca): coba mode baca lain.
     extra = getattr(ocr, "extra_candidates", None)
     if extra and not is_consistent(reading.parsed):

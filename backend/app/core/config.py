@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     # --- OCR ----------------------------------------------------------------
     OCR_ENGINE: str = "auto"  # auto (RapidOCR + cadangan Tesseract) | rapid | tesseract
     TESSERACT_CMD: str = ""  # kosong = cari tesseract di PATH
+    # Tesseract pada mesin auto: on_demand (dipanggil hanya bila RapidOCR/ML Kit belum yakin),
+    # always (selalu ikut dibaca, lebih lambat), off (tidak dipakai).
+    OCR_TESSERACT: str = "always"
     OCR_LANG: str = "ind+eng"
     OCR_PSM: int = 4
 
